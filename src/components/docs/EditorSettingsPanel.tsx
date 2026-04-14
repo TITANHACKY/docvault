@@ -12,8 +12,12 @@ import {
     FileText,
     Focus,
     ChevronsRight,
+    ArrowLeft,
+    ArrowRight,
+    ArrowUp,
+    ArrowDown,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import type { StoredComment } from "@/lib/documents-types";
 import { editorThemes, type EditorTheme } from "@/lib/editor-themes";
 
@@ -113,8 +117,79 @@ function ToggleRow({
 }
 
 export default function EditorSettingsPanel(props: EditorSettingsPanelProps) {
+    const { setTheme } = props;
     const [commentDraft, setCommentDraft] = useState("");
     const [themeFilter, setThemeFilter] = useState<"all" | "dark" | "light">("all");
+    const themeIndex = useMemo(
+        () => editorThemes.findIndex((themeOption) => themeOption.key === props.theme),
+        [props.theme],
+    );
+
+    const setThemeByIndex = useCallback(
+        (nextIndex: number) => {
+            const normalizedIndex = (nextIndex + editorThemes.length) % editorThemes.length;
+            setTheme(editorThemes[normalizedIndex].key);
+        },
+        [setTheme],
+    );
+
+    const handlePreviousTheme = useCallback(() => {
+        setThemeByIndex(themeIndex - 1);
+    }, [setThemeByIndex, themeIndex]);
+
+    const handleNextTheme = useCallback(() => {
+        setThemeByIndex(themeIndex + 1);
+    }, [setThemeByIndex, themeIndex]);
+
+    const handlePreviousRowTheme = useCallback(() => {
+        // 2-column theme grid: previous row is index - 2
+        setThemeByIndex(themeIndex - 2);
+    }, [setThemeByIndex, themeIndex]);
+
+    const handleNextRowTheme = useCallback(() => {
+        // 2-column theme grid: next row is index + 2
+        setThemeByIndex(themeIndex + 2);
+    }, [setThemeByIndex, themeIndex]);
+
+    useEffect(() => {
+        if (props.activePanel !== "themes") return;
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+                return;
+            }
+
+            switch (event.key) {
+                case "ArrowLeft":
+                    event.preventDefault();
+                    handlePreviousTheme();
+                    break;
+                case "ArrowRight":
+                    event.preventDefault();
+                    handleNextTheme();
+                    break;
+                case "ArrowUp":
+                    event.preventDefault();
+                    handlePreviousRowTheme();
+                    break;
+                case "ArrowDown":
+                    event.preventDefault();
+                    handleNextRowTheme();
+                    break;
+                default:
+                    break;
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [
+        props.activePanel,
+        handlePreviousTheme,
+        handleNextTheme,
+        handlePreviousRowTheme,
+        handleNextRowTheme,
+    ]);
 
     const visibleThemes = useMemo(() => {
         if (themeFilter === "all") return editorThemes;
@@ -209,10 +284,43 @@ export default function EditorSettingsPanel(props: EditorSettingsPanelProps) {
         );
     };
 
-    const renderStylesPanel = () => {
+    const renderThemesPanel = () => {
         return (
             <>
-                <label className="text-xs font-medium text-gray-500 block mb-2">Theme</label>
+                <div className="flex items-center gap-2 mb-4 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                    <span className="text-xs font-semibold text-gray-500 flex-1">Quick Switch (Use Arrows)</span>
+                    <div className="flex gap-1">
+                        <button
+                            onClick={handlePreviousRowTheme}
+                            className="p-1 px-2 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 transition-colors cursor-pointer"
+                            title="Previous row (Arrow Up)"
+                        >
+                            <ArrowUp size={14} />
+                        </button>
+                        <button
+                            onClick={handleNextRowTheme}
+                            className="p-1 px-2 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 transition-colors cursor-pointer"
+                            title="Next row (Arrow Down)"
+                        >
+                            <ArrowDown size={14} />
+                        </button>
+                        <button
+                            onClick={handlePreviousTheme}
+                            className="p-1 px-2 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 transition-colors cursor-pointer"
+                            title="Previous theme (Arrow Left)"
+                        >
+                            <ArrowLeft size={14} />
+                        </button>
+                        <button
+                            onClick={handleNextTheme}
+                            className="p-1 px-2 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 transition-colors cursor-pointer"
+                            title="Next theme (Arrow Right)"
+                        >
+                            <ArrowRight size={14} />
+                        </button>
+                    </div>
+                </div>
+
                 <div className="mb-3 inline-flex items-center gap-1 rounded-lg border border-gray-200 p-1">
                     {([
                         { key: "all", label: "All" },
@@ -233,7 +341,7 @@ export default function EditorSettingsPanel(props: EditorSettingsPanelProps) {
                     ))}
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 mb-5">
+                <div className="grid grid-cols-2 gap-2">
                     {visibleThemes.map((themeOption) => {
                         const isActive = props.theme === themeOption.key;
                         return (
@@ -269,7 +377,13 @@ export default function EditorSettingsPanel(props: EditorSettingsPanelProps) {
                         );
                     })}
                 </div>
+            </>
+        );
+    };
 
+    const renderStylesPanel = () => {
+        return (
+            <>
                 <label className="text-xs font-medium text-gray-500 block mb-2">Font style</label>
                 <div className="grid grid-cols-3 gap-2 mb-5">
                     {fontOptions.map((f) => (
@@ -390,6 +504,7 @@ export default function EditorSettingsPanel(props: EditorSettingsPanelProps) {
 
     const renderPanelContent = () => {
         if (props.activePanel === "styles") return renderStylesPanel();
+        if (props.activePanel === "themes") return renderThemesPanel();
         if (props.activePanel === "comments") return renderCommentsPanel();
         if (props.activePanel === "export") return renderExportPanel();
 

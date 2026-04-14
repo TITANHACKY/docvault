@@ -21,6 +21,7 @@ export interface EditorPreferences {
 }
 
 const PREFS_PREFIX = "doc-editor:prefs:v1:";
+const GLOBAL_PREFS_KEY = "doc-editor:prefs:global";
 
 function keyForDoc(docId: string): string {
   return `${PREFS_PREFIX}${docId}`;
@@ -31,11 +32,14 @@ export function loadEditorPreferences(
 ): Partial<EditorPreferences> | null {
   if (typeof window === "undefined") return null;
 
-  const raw = window.localStorage.getItem(keyForDoc(docId));
-  if (!raw) return null;
+  // Try global prefs first, then doc-specific as fallback
+  const globalRaw = window.localStorage.getItem(GLOBAL_PREFS_KEY);
+  const docRaw = window.localStorage.getItem(keyForDoc(docId));
 
   try {
-    return JSON.parse(raw) as Partial<EditorPreferences>;
+    const globalPrefs = globalRaw ? JSON.parse(globalRaw) : {};
+    const docPrefs = docRaw ? JSON.parse(docRaw) : {};
+    return { ...docPrefs, ...globalPrefs };
   } catch {
     return null;
   }
@@ -47,5 +51,8 @@ export function saveEditorPreferences(
 ): void {
   if (typeof window === "undefined") return;
 
-  window.localStorage.setItem(keyForDoc(docId), JSON.stringify(preferences));
+  // Save to doc-specific (for history/backup) and global (for current "user level" experience)
+  const prefsString = JSON.stringify(preferences);
+  window.localStorage.setItem(keyForDoc(docId), prefsString);
+  window.localStorage.setItem(GLOBAL_PREFS_KEY, prefsString);
 }

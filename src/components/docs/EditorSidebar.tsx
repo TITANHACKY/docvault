@@ -1,7 +1,7 @@
-import { MessageSquare, Type, Sparkles, LayoutGrid, Download } from "lucide-react";
+import { MessageSquare, Type, Sparkles, LayoutGrid, Download, Palette, Moon, Sun } from "lucide-react";
 import EditorSettingsPanel from "@/components/docs/EditorSettingsPanel";
 import type { StoredComment } from "@/lib/documents-types";
-import type { EditorTheme } from "@/lib/editor-themes";
+import { editorThemes, getEditorTheme, type EditorTheme } from "@/lib/editor-themes";
 
 interface EditorStats {
     words: number;
@@ -52,6 +52,7 @@ interface EditorSidebarProps {
 export default function EditorSidebar(props: EditorSidebarProps) {
     const isPanelOpen = props.activePanel !== null;
     const disabledPanelIds = props.disabledPanelIds ?? [];
+    const activeTheme = getEditorTheme(props.theme);
 
     return (
         <div className="flex shrink-0">
@@ -101,6 +102,7 @@ export default function EditorSidebar(props: EditorSidebarProps) {
                 {[
                     { id: "comments", icon: MessageSquare },
                     { id: "styles", icon: Type },
+                    { id: "themes", icon: Palette },
                     { id: "ai", icon: Sparkles },
                     { id: "templates", icon: LayoutGrid },
                     { id: "export", icon: Download },
@@ -125,6 +127,30 @@ export default function EditorSidebar(props: EditorSidebarProps) {
                     );
                 }
                 )}
+
+                <div className="mt-auto pb-1 flex flex-col items-center gap-1">
+                    <button
+                        onClick={() => {
+                            const currentMode = activeTheme.mode;
+                            const nextMode = currentMode === "light" ? "dark" : "light";
+                            const modeThemes = editorThemes.filter((themeOption) => themeOption.mode === nextMode);
+                            if (modeThemes.length === 0) return;
+
+                            // Keep the relative index when switching mode for a predictable toggle.
+                            const currentModeThemes = editorThemes.filter((themeOption) => themeOption.mode === currentMode);
+                            const currentIndexInMode = currentModeThemes.findIndex((themeOption) => themeOption.key === props.theme);
+                            const nextIndexInMode = currentIndexInMode >= 0
+                                ? currentIndexInMode % modeThemes.length
+                                : 0;
+
+                            props.setTheme(modeThemes[nextIndexInMode].key);
+                        }}
+                        title={activeTheme.mode === "light" ? "Switch to Dark Mode" : "Switch to Light Mode"}
+                        className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                    >
+                        {activeTheme.mode === "light" ? <Moon size={17} /> : <Sun size={17} />}
+                    </button>
+                </div>
             </div>
         </div>
     );

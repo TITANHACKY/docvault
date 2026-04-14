@@ -149,6 +149,7 @@ export default function DocEditorPage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [isGuestMode, setIsGuestMode] = useState(false);
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
+  const [preferencesHydrated, setPreferencesHydrated] = useState(false);
 
   const saveAbortControllerRef = useRef<AbortController | null>(null);
   const latestSaveTokenRef = useRef(0);
@@ -185,42 +186,50 @@ export default function DocEditorPage() {
   }, []);
 
   useEffect(() => {
+    setPreferencesHydrated(false);
     if (!docId) return;
 
     const timeout = window.setTimeout(() => {
       const prefs = loadEditorPreferences(docId);
-      if (!prefs) return;
+      if (prefs) {
+        if (typeof prefs.fontStyle === "string") setFontStyle(prefs.fontStyle);
+        if (typeof prefs.theme === "string" && isEditorTheme(prefs.theme)) {
+          setTheme(prefs.theme);
+        }
+        if (prefs.fontSize === "small" || prefs.fontSize === "default" || prefs.fontSize === "large") {
+          setFontSize(prefs.fontSize);
+        }
+        if (prefs.pageWidth === "default" || prefs.pageWidth === "full") {
+          setPageWidth(prefs.pageWidth);
+        }
+        if (typeof prefs.coverImage === "boolean") setCoverImage(prefs.coverImage);
+        if (typeof prefs.pageIconTitle === "boolean") setPageIconTitle(prefs.pageIconTitle);
+        if (typeof prefs.owners === "boolean") setOwners(prefs.owners);
+        if (typeof prefs.contributors === "boolean") setContributors(prefs.contributors);
+        if (typeof prefs.subtitle === "boolean") setSubtitle(prefs.subtitle);
+        if (typeof prefs.lastModified === "boolean") setLastModified(prefs.lastModified);
+        if (typeof prefs.pageOutline === "boolean") setPageOutline(prefs.pageOutline);
+        if (typeof prefs.focusBlock === "boolean") setFocusBlock(prefs.focusBlock);
+        if (typeof prefs.focusPage === "boolean") setFocusPage(prefs.focusPage);
+        if (typeof prefs.showStatsOnPage === "boolean") setShowStatsOnPage(prefs.showStatsOnPage);
+        if (typeof prefs.isPagesSidebarOpen === "boolean") {
+          setIsPagesSidebarOpen(prefs.isPagesSidebarOpen);
+        }
+      }
 
-      if (typeof prefs.fontStyle === "string") setFontStyle(prefs.fontStyle);
-      if (typeof prefs.theme === "string" && isEditorTheme(prefs.theme)) {
-        setTheme(prefs.theme);
-      }
-      if (prefs.fontSize === "small" || prefs.fontSize === "default" || prefs.fontSize === "large") {
-        setFontSize(prefs.fontSize);
-      }
-      if (prefs.pageWidth === "default" || prefs.pageWidth === "full") {
-        setPageWidth(prefs.pageWidth);
-      }
-      if (typeof prefs.coverImage === "boolean") setCoverImage(prefs.coverImage);
-      if (typeof prefs.pageIconTitle === "boolean") setPageIconTitle(prefs.pageIconTitle);
-      if (typeof prefs.owners === "boolean") setOwners(prefs.owners);
-      if (typeof prefs.contributors === "boolean") setContributors(prefs.contributors);
-      if (typeof prefs.subtitle === "boolean") setSubtitle(prefs.subtitle);
-      if (typeof prefs.lastModified === "boolean") setLastModified(prefs.lastModified);
-      if (typeof prefs.pageOutline === "boolean") setPageOutline(prefs.pageOutline);
-      if (typeof prefs.focusBlock === "boolean") setFocusBlock(prefs.focusBlock);
-      if (typeof prefs.focusPage === "boolean") setFocusPage(prefs.focusPage);
-      if (typeof prefs.showStatsOnPage === "boolean") setShowStatsOnPage(prefs.showStatsOnPage);
-      if (typeof prefs.isPagesSidebarOpen === "boolean") {
-        setIsPagesSidebarOpen(prefs.isPagesSidebarOpen);
-      }
+      setPreferencesHydrated(true);
     }, 0);
 
     return () => window.clearTimeout(timeout);
   }, [docId]);
 
   useEffect(() => {
-    if (!docId) return;
+    if (!preferencesHydrated) return;
+    saveGlobalEditorTheme(theme);
+  }, [preferencesHydrated, theme]);
+
+  useEffect(() => {
+    if (!docId || !preferencesHydrated) return;
 
     const timeout = window.setTimeout(() => {
       saveEditorPreferences(docId, {
@@ -240,12 +249,12 @@ export default function DocEditorPage() {
         showStatsOnPage,
         isPagesSidebarOpen,
       });
-      saveGlobalEditorTheme(theme);
     }, 250);
 
     return () => window.clearTimeout(timeout);
   }, [
     docId,
+    preferencesHydrated,
     fontStyle,
     theme,
     fontSize,
@@ -599,6 +608,7 @@ export default function DocEditorPage() {
     const panelMap: Record<string, string> = {
       comments: "Comments",
       styles: "Page Styles",
+      themes: "Themes",
       ai: "AI Assistant",
       templates: "Templates",
       export: "Export",
@@ -843,7 +853,7 @@ export default function DocEditorPage() {
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 bg-(--editor-bg)/80 px-4 py-4 backdrop-blur-sm">
           <div className="flex min-w-0 items-center gap-2">
             <Link
-              href="/docs"
+              href="/"
               className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 ${isDarkTheme
                 ? "border-white/20 bg-black/30 text-slate-100 hover:bg-white/10"
                 : ""

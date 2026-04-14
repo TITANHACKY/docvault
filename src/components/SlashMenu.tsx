@@ -118,10 +118,10 @@ const SlashMenu = ({ query, command, onClose, position }: SlashMenuProps) => {
     if (flatItems.length === 0) {
         return (
             <div
-                className="absolute z-50 bg-white shadow-xl border border-gray-200 rounded-xl p-3 w-80"
+                className="absolute z-50 bg-(--editor-bg) shadow-xl border border-(--editor-border) rounded-xl p-3 w-80"
                 style={{ top: position.top, left: position.left }}
             >
-                <p className="text-sm text-gray-400 text-center py-2">No results</p>
+                <p className="text-sm text-(--editor-text-muted) text-center py-2">No results</p>
             </div>
         );
     }
@@ -130,7 +130,7 @@ const SlashMenu = ({ query, command, onClose, position }: SlashMenuProps) => {
         <div
             ref={menuRef}
             onMouseDown={(e) => e.preventDefault()}
-            className="absolute z-50 bg-white shadow-xl border border-gray-200 rounded-xl w-105 max-h-100 overflow-y-auto"
+            className="absolute z-50 bg-(--editor-bg) shadow-2xl border border-(--editor-border) rounded-xl w-105 max-h-100 overflow-y-auto backdrop-blur-md"
             style={{ top: position.top, left: position.left }}
         >
             {categories.map((cat, catIndex) => {
@@ -138,7 +138,7 @@ const SlashMenu = ({ query, command, onClose, position }: SlashMenuProps) => {
                 return (
                     <div key={cat.name} className="px-2 pt-3 pb-1">
                         {/* Category header */}
-                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-1 mb-1.5">
+                        <p className="text-[11px] font-semibold text-(--editor-text-muted) uppercase tracking-wider px-1 mb-1.5">
                             {cat.name}
                         </p>
                         {/* 2-column grid */}
@@ -158,14 +158,14 @@ const SlashMenu = ({ query, command, onClose, position }: SlashMenuProps) => {
                                         }}
                                         onMouseEnter={() => setSelectedIndex(idx)}
                                         className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left transition-colors ${isSelected
-                                            ? "bg-purple-50 text-purple-700"
-                                            : "text-gray-700 hover:bg-gray-50"
+                                            ? "bg-(--editor-accent)/10 text-(--editor-accent)"
+                                            : "text-(--editor-text) hover:bg-(--editor-surface-muted)"
                                             }`}
                                     >
                                         <div
                                             className={`flex items-center justify-center w-7 h-7 rounded-md shrink-0 ${isSelected
-                                                ? "bg-purple-100 text-purple-600"
-                                                : "bg-gray-100 text-gray-500"
+                                                ? "bg-(--editor-accent)/20 text-(--editor-accent)"
+                                                : "bg-(--editor-surface) text-(--editor-text-muted)"
                                                 }`}
                                         >
                                             <item.icon size={15} />
