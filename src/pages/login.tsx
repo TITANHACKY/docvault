@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { loginUser, registerUser } from "@/lib/auth-client";
 import { syncGuestDataToServer } from "@/lib/guest-sync";
 import {
@@ -10,6 +10,7 @@ import {
     loadGlobalEditorTheme,
     type EditorTheme,
 } from "@/lib/editor-themes";
+import { applyEditorThemeToHtml } from "@/lib/html-theme";
 
 export default function LoginPage() {
     const router = useRouter();
@@ -27,20 +28,9 @@ export default function LoginPage() {
     const themeDefinition = useMemo(() => getEditorTheme(theme), [theme]);
     const isDarkTheme = themeDefinition.mode === "dark";
     const themeModeClass = isDarkTheme ? "editor-theme-dark" : "editor-theme-light";
-    const themeStyle = useMemo(
-        () =>
-        ({
-            "--editor-bg": themeDefinition.palette.bg,
-            "--editor-surface": themeDefinition.palette.surface,
-            "--editor-surface-muted": themeDefinition.palette.surfaceMuted,
-            "--editor-border": themeDefinition.palette.border,
-            "--editor-text": themeDefinition.palette.text,
-            "--editor-text-muted": themeDefinition.palette.textMuted,
-            "--editor-prose": themeDefinition.palette.prose,
-            "--editor-accent": themeDefinition.accent,
-        } as CSSProperties),
-        [themeDefinition],
-    );
+    useEffect(() => {
+        applyEditorThemeToHtml(theme);
+    }, [theme]);
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -74,7 +64,7 @@ export default function LoginPage() {
     };
 
     return (
-        <main className={`editor-theme ${themeModeClass} flex min-h-screen items-center justify-center bg-gray-50 px-4`} style={themeStyle}>
+        <main className={`editor-theme ${themeModeClass} flex min-h-screen items-center justify-center bg-gray-50 px-4`}>
             <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                 <h1 className="text-2xl font-semibold text-gray-900">
                     {mode === "login" ? "Welcome back" : "Create your account"}

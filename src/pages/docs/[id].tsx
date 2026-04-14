@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef, type CSSProperties } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { ArrowLeft, ChevronsLeft, FileText, GitBranch, Plus, Trash2 } from "lucide-react";
@@ -41,6 +41,7 @@ import {
   saveGlobalEditorTheme,
   type EditorTheme,
 } from "@/lib/editor-themes";
+import { applyEditorThemeToHtml } from "@/lib/html-theme";
 
 interface EditorStats {
   words: number;
@@ -226,6 +227,7 @@ export default function DocEditorPage() {
   useEffect(() => {
     if (!preferencesHydrated) return;
     saveGlobalEditorTheme(theme);
+    applyEditorThemeToHtml(theme);
   }, [preferencesHydrated, theme]);
 
   useEffect(() => {
@@ -580,23 +582,8 @@ export default function DocEditorPage() {
   const fontSizeClass =
     fontSize === "small" ? "editor-text-sm" : fontSize === "large" ? "editor-text-lg" : "";
   const themeDefinition = useMemo(() => getEditorTheme(theme), [theme]);
-  const themePalette = themeDefinition.palette;
   const isDarkTheme = themeDefinition.mode === "dark";
   const themeModeClass = isDarkTheme ? "editor-theme-dark" : "editor-theme-light";
-  const themeStyle = useMemo(
-    () =>
-    ({
-      "--editor-bg": themePalette.bg,
-      "--editor-surface": themePalette.surface,
-      "--editor-surface-muted": themePalette.surfaceMuted,
-      "--editor-border": themePalette.border,
-      "--editor-text": themePalette.text,
-      "--editor-text-muted": themePalette.textMuted,
-      "--editor-prose": themePalette.prose,
-      "--editor-accent": themeDefinition.accent,
-    } as CSSProperties),
-    [themeDefinition.accent, themePalette],
-  );
 
   const handleStatsChange = useCallback((nextStats: EditorStats) => {
     setStats(nextStats);
@@ -755,14 +742,14 @@ export default function DocEditorPage() {
 
   if (!activePage) {
     return (
-      <main className={`editor-theme ${themeModeClass} flex min-h-screen items-center justify-center bg-white text-gray-500`} style={themeStyle}>
+      <main className={`editor-theme ${themeModeClass} flex min-h-screen items-center justify-center bg-white text-gray-500`}>
         {authChecked ? "Loading document..." : "Checking session..."}
       </main>
     );
   }
 
   return (
-    <main className={`editor-theme ${themeModeClass} flex h-screen overflow-hidden bg-white`} style={themeStyle}>
+    <main className={`editor-theme ${themeModeClass} flex h-screen overflow-hidden bg-white`}>
       <ToastRegion toasts={toasts} onDismiss={dismissToast} />
       <AuthDialog
         open={isAuthDialogOpen}
@@ -906,7 +893,7 @@ export default function DocEditorPage() {
                 onClick={() => {
                   setIsAuthDialogOpen(true);
                 }}
-                className="editor-accent-button inline-flex cursor-pointer items-center rounded-xl px-3 py-2 text-sm text-white"
+                className="inline-flex cursor-pointer items-center rounded-xl bg-(--editor-surface) px-4 py-2.5 text-sm font-semibold text-(--editor-text) ring-1 ring-inset ring-(--editor-border) transition-all"
                 title="Sign in to sync this document"
               >
                 Sign in
@@ -916,10 +903,7 @@ export default function DocEditorPage() {
                 onClick={() => {
                   void handleLogout();
                 }}
-                className={`inline-flex cursor-pointer items-center rounded-xl px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 ${isDarkTheme
-                  ? "text-slate-300 hover:bg-white/10 hover:text-white"
-                  : ""
-                  }`}
+                className="inline-flex cursor-pointer items-center rounded-xl bg-(--editor-surface) px-4 py-2.5 text-sm font-semibold text-(--editor-text) ring-1 ring-inset ring-(--editor-border) transition-all"
                 title="Sign out"
               >
                 Sign out

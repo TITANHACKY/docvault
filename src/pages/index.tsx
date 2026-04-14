@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, FileText } from "lucide-react";
 import {
   createDocument,
@@ -18,6 +18,7 @@ import {
   loadGlobalEditorTheme,
   type EditorTheme,
 } from "@/lib/editor-themes";
+import { applyEditorThemeToHtml } from "@/lib/html-theme";
 import {
   createGuestDocument,
   deleteGuestDocument,
@@ -40,19 +41,9 @@ export default function DocumentsPage() {
   const themeDefinition = useMemo(() => getEditorTheme(theme), [theme]);
   const isDarkTheme = themeDefinition.mode === "dark";
   const themeModeClass = isDarkTheme ? "editor-theme-dark" : "editor-theme-light";
-  const themeStyle = useMemo(
-    () => ({
-      "--editor-bg": themeDefinition.palette.bg,
-      "--editor-surface": themeDefinition.palette.surface,
-      "--editor-surface-muted": themeDefinition.palette.surfaceMuted,
-      "--editor-border": themeDefinition.palette.border,
-      "--editor-text": themeDefinition.palette.text,
-      "--editor-text-muted": themeDefinition.palette.textMuted,
-      "--editor-prose": themeDefinition.palette.prose,
-      "--editor-accent": themeDefinition.accent,
-    } as CSSProperties),
-    [themeDefinition],
-  );
+  useEffect(() => {
+    applyEditorThemeToHtml(theme);
+  }, [theme]);
 
   const pushToast = useCallback((tone: ToastMessage["tone"], message: string) => {
     setToasts((previous) => [
@@ -140,7 +131,7 @@ export default function DocumentsPage() {
   }
 
   return (
-    <main className={`editor-theme ${themeModeClass} min-h-screen bg-(--editor-bg) text-(--editor-text)`} style={themeStyle}>
+    <main className={`editor-theme ${themeModeClass} min-h-screen bg-(--editor-bg) text-(--editor-text)`}>
       <ToastRegion toasts={toasts} onDismiss={dismissToast} />
       <AuthDialog
         open={isAuthDialogOpen}
