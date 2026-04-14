@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { ArrowLeft, ChevronsLeft, FileText, GitBranch, Plus, Trash2 } from "lucide-react";
@@ -33,6 +33,14 @@ import {
   loadEditorPreferences,
   saveEditorPreferences,
 } from "@/lib/editor-preferences";
+import AuthDialog from "@/components/auth/AuthDialog";
+import {
+  getEditorTheme,
+  isEditorTheme,
+  loadGlobalEditorTheme,
+  saveGlobalEditorTheme,
+  type EditorTheme,
+} from "@/lib/editor-themes";
 
 interface EditorStats {
   words: number;
@@ -105,6 +113,10 @@ export default function DocEditorPage() {
   const docId = typeof router.query.id === "string" ? router.query.id : undefined;
 
   const [fontStyle, setFontStyle] = useState("font-system");
+  const [theme, setTheme] = useState<EditorTheme>(() => {
+    if (typeof window === "undefined") return "notesnook-light";
+    return loadGlobalEditorTheme() ?? "notesnook-light";
+  });
   const [fontSize, setFontSize] = useState<"small" | "default" | "large">("default");
   const [pageWidth, setPageWidth] = useState<"default" | "full">("default");
 
@@ -136,10 +148,13 @@ export default function DocEditorPage() {
   const [isOnline, setIsOnline] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
   const [isGuestMode, setIsGuestMode] = useState(false);
+  const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
 
   const saveAbortControllerRef = useRef<AbortController | null>(null);
   const latestSaveTokenRef = useRef(0);
   const lastSyncedServerUpdatedAtRef = useRef(0);
+  const pendingQueryPageRef = useRef<string | null>(null);
+  const onOpenLinkedPageRef = useRef<((id: string) => void) | null>(null);
 
   const pushToast = useCallback((tone: ToastMessage["tone"], message: string) => {
     setToasts((previous) => [
@@ -177,6 +192,9 @@ export default function DocEditorPage() {
       if (!prefs) return;
 
       if (typeof prefs.fontStyle === "string") setFontStyle(prefs.fontStyle);
+      if (typeof prefs.theme === "string" && isEditorTheme(prefs.theme)) {
+        setTheme(prefs.theme);
+      }
       if (prefs.fontSize === "small" || prefs.fontSize === "default" || prefs.fontSize === "large") {
         setFontSize(prefs.fontSize);
       }
@@ -207,6 +225,7 @@ export default function DocEditorPage() {
     const timeout = window.setTimeout(() => {
       saveEditorPreferences(docId, {
         fontStyle,
+        theme,
         fontSize,
         pageWidth,
         coverImage,
@@ -221,12 +240,14 @@ export default function DocEditorPage() {
         showStatsOnPage,
         isPagesSidebarOpen,
       });
+      saveGlobalEditorTheme(theme);
     }, 250);
 
     return () => window.clearTimeout(timeout);
   }, [
     docId,
     fontStyle,
+    theme,
     fontSize,
     pageWidth,
     coverImage,
@@ -282,8 +303,15 @@ export default function DocEditorPage() {
             }));
 
             const validDraft = localDraft ? sanitizeDraft(localDraft) : null;
+            const isBrandNewDocument =
+              existingDocument.pages.length <= 1 &&
+              existingDocument.title === "Untitled" &&
+              (Date.now() - existingDocument.updatedAt < 5000);
+
             const shouldRestoreDraft =
-              validDraft !== null && validDraft.updatedAt > existingDocument.updatedAt;
+              !isBrandNewDocument &&
+              validDraft !== null &&
+              validDraft.updatedAt > existingDocument.updatedAt;
 
             const finalTitle = shouldRestoreDraft ? validDraft.title : existingDocument.title || "Doc";
             const finalPages = shouldRestoreDraft
@@ -302,7 +330,12 @@ export default function DocEditorPage() {
             setIsDocumentReady(true);
 
             if (shouldRestoreDraft) {
-              pushToast("info", "Restored newer local draft");
+              // Only toast if the draft actually adds value (different page count or title)
+              const pagesChanged = validDraft.pages.length !== sanitizedPages.length;
+              const titleChanged = validDraft.title !== existingDocument.title;
+              if (pagesChanged || titleChanged) {
+                pushToast("info", "Restored newer local draft");
+              }
             }
 
             return;
@@ -343,24 +376,46 @@ export default function DocEditorPage() {
     }, 0);
 
     return () => clearTimeout(timeout);
-  }, [docId, pushToast, router]);
+  }, [docId, pushToast]);
 
   const handleLogout = useCallback(async () => {
     await logoutUser();
-    await router.replace("/login");
-  }, [router]);
+    setIsGuestMode(true);
+    setComments([]);
+    pushToast("info", "Signed out");
+  }, [pushToast]);
 
   useEffect(() => {
+    if (!router.isReady) return;
+
     const pageFromQuery = typeof router.query.page === "string" ? router.query.page : null;
+
+    if (pendingQueryPageRef.current) {
+      if (pageFromQuery === pendingQueryPageRef.current) {
+        pendingQueryPageRef.current = null;
+      }
+      return;
+    }
+
+    if (!pageFromQuery && activePageId && pages.length > 0) {
+      // If we're on a doc but no page is in the URL, don't let the URL "blank out" our internal state.
+      // Instead, we will let the other useEffect push our activePageId to the URL.
+      return;
+    }
+
     if (!pageFromQuery) return;
     if (!pages.some((page) => page.id === pageFromQuery)) return;
+    if (pageFromQuery === activePageId) return;
     setActivePageId(pageFromQuery);
-  }, [router.query.page, pages]);
+  }, [router.isReady, router.query.page, pages, activePageId]);
 
   useEffect(() => {
+    if (!router.isReady) return;
     if (!docId || !activePageId) return;
     const pageFromQuery = typeof router.query.page === "string" ? router.query.page : null;
     if (pageFromQuery === activePageId) return;
+
+    pendingQueryPageRef.current = activePageId;
 
     void router.replace(
       {
@@ -370,7 +425,7 @@ export default function DocEditorPage() {
       undefined,
       { shallow: true },
     );
-  }, [docId, activePageId, router]);
+  }, [router.isReady, docId, activePageId, router]);
 
   useEffect(() => {
     if (!authChecked || !docId || !isDocumentReady || pages.length === 0 || !activePage) return;
@@ -515,6 +570,24 @@ export default function DocEditorPage() {
 
   const fontSizeClass =
     fontSize === "small" ? "editor-text-sm" : fontSize === "large" ? "editor-text-lg" : "";
+  const themeDefinition = useMemo(() => getEditorTheme(theme), [theme]);
+  const themePalette = themeDefinition.palette;
+  const isDarkTheme = themeDefinition.mode === "dark";
+  const themeModeClass = isDarkTheme ? "editor-theme-dark" : "editor-theme-light";
+  const themeStyle = useMemo(
+    () =>
+    ({
+      "--editor-bg": themePalette.bg,
+      "--editor-surface": themePalette.surface,
+      "--editor-surface-muted": themePalette.surfaceMuted,
+      "--editor-border": themePalette.border,
+      "--editor-text": themePalette.text,
+      "--editor-text-muted": themePalette.textMuted,
+      "--editor-prose": themePalette.prose,
+      "--editor-accent": themeDefinition.accent,
+    } as CSSProperties),
+    [themeDefinition.accent, themePalette],
+  );
 
   const handleStatsChange = useCallback((nextStats: EditorStats) => {
     setStats(nextStats);
@@ -533,13 +606,6 @@ export default function DocEditorPage() {
 
     return panelMap[activePanel ?? "styles"] ?? "Page Styles";
   }, [activePanel]);
-
-  useEffect(() => {
-    if (!isGuestMode) return;
-    if (activePanel === "ai" || activePanel === "templates") {
-      setActivePanel(null);
-    }
-  }, [isGuestMode, activePanel]);
 
   const handleAddComment = useCallback(
     async (commentContent: string) => {
@@ -560,37 +626,22 @@ export default function DocEditorPage() {
     [authChecked, docId, isGuestMode, pushToast],
   );
 
-  const handleExport = useCallback(
-    (format: "markdown" | "text") => {
-      const pageTitle = activePage?.title || "untitled";
-      const pageContent = activePage?.content || "<p></p>";
-
-      const baseName =
-        pageTitle
-          .toLowerCase()
-          .trim()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/(^-|-$)/g, "") || "untitled";
-
-      if (format === "markdown") {
-        downloadTextFile(`${baseName}.md`, htmlToMarkdown(pageContent));
-        return;
-      }
-
-      downloadTextFile(`${baseName}.txt`, htmlToPlainText(pageContent));
-    },
-    [activePage],
-  );
+  const selectPage = useCallback((pageId: string) => {
+    if (!pageId || pageId === activePageId) return;
+    pendingQueryPageRef.current = pageId;
+    setActivePageId(pageId);
+  }, [activePageId]);
 
   const handleCreatePage = useCallback(
     () => {
       const nextPage = createPage("Untitled");
 
       setPages((previous) => [...previous, nextPage]);
+      selectPage(nextPage.id);
       setIsPagesSidebarOpen(true);
       pushToast("success", "Page created");
     },
-    [pushToast],
+    [pushToast, selectPage],
   );
 
   const handleDeletePage = useCallback(
@@ -661,25 +712,61 @@ export default function DocEditorPage() {
   const handleOpenLinkedPage = useCallback(
     (pageId: string) => {
       if (!pages.some((page) => page.id === pageId)) return;
-      setActivePageId(pageId);
+      selectPage(pageId);
     },
-    [pages],
+    [pages, selectPage],
   );
+
+  const handleExport = useCallback(
+    (format: "markdown" | "text") => {
+      const pageTitle = activePage?.title || "untitled";
+      const pageContent = activePage?.content || "<p></p>";
+
+      const baseName =
+        pageTitle
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/(^-|-$)/g, "") || "untitled";
+
+      if (format === "markdown") {
+        downloadTextFile(`${baseName}.md`, htmlToMarkdown(pageContent));
+        return;
+      }
+
+      downloadTextFile(`${baseName}.txt`, htmlToPlainText(pageContent));
+    },
+    [activePage],
+  );
+
+  useEffect(() => {
+    onOpenLinkedPageRef.current = handleOpenLinkedPage;
+  }, [handleOpenLinkedPage]);
 
   if (!activePage) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-white text-gray-500">
+      <main className={`editor-theme ${themeModeClass} flex min-h-screen items-center justify-center bg-white text-gray-500`} style={themeStyle}>
         {authChecked ? "Loading document..." : "Checking session..."}
       </main>
     );
   }
 
   return (
-    <main className="flex min-h-screen bg-white">
+    <main className={`editor-theme ${themeModeClass} flex h-screen overflow-hidden bg-white`} style={themeStyle}>
       <ToastRegion toasts={toasts} onDismiss={dismissToast} />
+      <AuthDialog
+        open={isAuthDialogOpen}
+        onClose={() => setIsAuthDialogOpen(false)}
+        onSuccess={async () => {
+          setIsGuestMode(false);
+          const nextComments = docId ? await listComments(docId) : [];
+          setComments(nextComments);
+          pushToast("success", "Signed in and synced");
+        }}
+      />
 
       {isPagesSidebarOpen ? (
-        <aside className="hidden w-72 shrink-0 border-r border-gray-200 bg-gray-50 lg:block">
+        <aside className="hidden h-screen w-72 shrink-0 overflow-y-auto border-r border-gray-200 bg-gray-50 lg:block">
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-4">
             <input
               value={documentTitle}
@@ -706,8 +793,13 @@ export default function DocEditorPage() {
                 return (
                   <li key={page.id} className="group flex items-center gap-1">
                     <button
-                      onClick={() => setActivePageId(page.id)}
+                      onClick={() => selectPage(page.id)}
                       className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${isActive ? "bg-gray-200 text-gray-900" : "text-gray-600 hover:bg-gray-100"
+                        } ${isDarkTheme
+                          ? isActive
+                            ? "bg-white/14 text-white"
+                            : "text-slate-300 hover:bg-white/10 hover:text-white"
+                          : ""
                         }`}
                       title={`Open page ${page.title || "Untitled"}`}
                     >
@@ -717,7 +809,10 @@ export default function DocEditorPage() {
 
                     <button
                       onClick={() => handleDeletePage(page.id)}
-                      className="cursor-pointer rounded-md p-1.5 text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-red-600 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      className={`cursor-pointer rounded-md p-1.5 text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-red-600 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40 ${isDarkTheme
+                        ? "text-slate-400 hover:bg-white/10 hover:text-rose-300"
+                        : ""
+                        }`}
                       aria-label={`Delete page ${page.title || "Untitled"}`}
                       title={`Delete page ${page.title || "Untitled"}`}
                       disabled={pages.length <= 1}
@@ -731,7 +826,10 @@ export default function DocEditorPage() {
 
             <button
               onClick={() => handleCreatePage()}
-              className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-500 hover:bg-gray-100"
+              className={`mt-2 inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 ${isDarkTheme
+                ? "text-sky-300 hover:bg-white/10 hover:text-sky-200"
+                : ""
+                }`}
               title="Create a new page"
             >
               <Plus size={16} />
@@ -741,12 +839,15 @@ export default function DocEditorPage() {
         </aside>
       ) : null}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 bg-(--editor-bg)/80 px-4 py-4 backdrop-blur-sm">
           <div className="flex min-w-0 items-center gap-2">
             <Link
               href="/docs"
-              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+              className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 ${isDarkTheme
+                ? "border-white/20 bg-black/30 text-slate-100 hover:bg-white/10"
+                : ""
+                }`}
               title="Back to all documents"
             >
               <ArrowLeft size={16} />
@@ -756,7 +857,10 @@ export default function DocEditorPage() {
             {!isPagesSidebarOpen && (
               <button
                 onClick={() => setIsPagesSidebarOpen(true)}
-                className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 ${isDarkTheme
+                  ? "border-white/20 bg-black/30 text-slate-100 hover:bg-white/10"
+                  : ""
+                  }`}
                 title="Open pages sidebar"
               >
                 <FileText size={16} />
@@ -766,7 +870,10 @@ export default function DocEditorPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-500">
+            <div className={`inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-500 ${isDarkTheme
+              ? "border-white/15 bg-white/10 text-slate-300"
+              : ""
+              }`}>
               <span
                 className={`h-2 w-2 rounded-full ${isOnline ? "bg-emerald-500" : "bg-amber-500"}`}
                 title={isOnline ? "Network is online" : "Network is offline"}
@@ -787,9 +894,9 @@ export default function DocEditorPage() {
             {isGuestMode ? (
               <button
                 onClick={() => {
-                  void router.push("/login");
+                  setIsAuthDialogOpen(true);
                 }}
-                className="inline-flex cursor-pointer items-center rounded-xl bg-gray-900 px-3 py-2 text-sm text-white hover:bg-gray-800"
+                className="editor-accent-button inline-flex cursor-pointer items-center rounded-xl px-3 py-2 text-sm text-white"
                 title="Sign in to sync this document"
               >
                 Sign in
@@ -799,7 +906,10 @@ export default function DocEditorPage() {
                 onClick={() => {
                   void handleLogout();
                 }}
-                className="inline-flex cursor-pointer items-center rounded-xl px-3 py-2 text-sm text-gray-500 hover:bg-gray-100"
+                className={`inline-flex cursor-pointer items-center rounded-xl px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 ${isDarkTheme
+                  ? "text-slate-300 hover:bg-white/10 hover:text-white"
+                  : ""
+                  }`}
                 title="Sign out"
               >
                 Sign out
@@ -808,33 +918,35 @@ export default function DocEditorPage() {
           </div>
         </div>
 
-        <div className="flex flex-1 justify-center px-8 pb-4 pt-8">
-          <div className={`w-full ${pageWidth === "full" ? "max-w-none px-8" : "max-w-3xl"}`}>
-            <div className="mb-8 flex w-fit items-center gap-2 text-sm text-gray-400">
-              <GitBranch size={16} className="rotate-90" />
-              <span className="font-medium">Link Task or Doc</span>
-            </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="flex justify-center px-8 pb-4 pt-8">
+            <div className={`w-full ${pageWidth === "full" ? "max-w-none px-8" : "max-w-3xl"}`}>
+              <div className="mb-8 flex w-fit items-center gap-2 text-sm text-gray-400">
+                <GitBranch size={16} className="rotate-90" />
+                <span className="font-medium">Link Task or Doc</span>
+              </div>
 
-            <div className={fontSizeClass}>
-              <TiptapEditor
-                title={activePage.title}
-                onTitleChange={handlePageTitleChange}
-                content={activePage.content}
-                onContentChange={handlePageContentChange}
-                onStatsChange={handleStatsChange}
-                showOwners={owners}
-                showLastModified={lastModified}
-                fontClass={fontStyle}
-                onCreatePage={handleCreatePage}
-                mentionPages={mentionPages}
-                onOpenLinkedPage={handleOpenLinkedPage}
-              />
+              <div className={fontSizeClass}>
+                <TiptapEditor
+                  title={activePage.title}
+                  onTitleChange={handlePageTitleChange}
+                  content={activePage.content}
+                  onContentChange={handlePageContentChange}
+                  onStatsChange={handleStatsChange}
+                  showOwners={owners}
+                  showLastModified={lastModified}
+                  fontClass={fontStyle}
+                  onCreatePage={handleCreatePage}
+                  mentionPages={mentionPages}
+                  onOpenLinkedPage={handleOpenLinkedPage}
+                />
+              </div>
             </div>
           </div>
         </div>
 
         {showStatsOnPage && (
-          <div className="border-t border-gray-100 px-8 py-2 text-xs text-gray-400">{stats.words} words</div>
+          <div className="shrink-0 border-t border-gray-100 px-8 py-2 text-xs text-gray-400">{stats.words} words</div>
         )}
       </div>
 
@@ -842,6 +954,8 @@ export default function DocEditorPage() {
         activePanel={activePanel}
         setActivePanel={setActivePanel}
         activePanelTitle={activePanelTitle}
+        theme={theme}
+        setTheme={setTheme}
         fontStyle={fontStyle}
         setFontStyle={setFontStyle}
         fontSize={fontSize}

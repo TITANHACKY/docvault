@@ -1,8 +1,10 @@
 export type EditorFontSize = "small" | "default" | "large";
 export type EditorPageWidth = "default" | "full";
+import type { EditorTheme } from "@/lib/editor-themes";
 
 export interface EditorPreferences {
   fontStyle: string;
+  theme: EditorTheme;
   fontSize: EditorFontSize;
   pageWidth: EditorPageWidth;
   coverImage: boolean;

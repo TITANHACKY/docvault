@@ -33,3 +33,97 @@ body {
 .font-mono {
   font-family: var(--font-mono);
 }
+
+.editor-theme {
+  --editor-bg: #f8fafc;
+  --editor-surface: #ffffff;
+  --editor-surface-muted: #f1f5f9;
+  --editor-border: #dbe2ea;
+  --editor-text: #1f2937;
+  --editor-text-muted: #64748b;
+  --editor-prose: #1f2937;
+  --editor-accent: #2563eb;
+  background: var(--editor-bg) !important;
+  color: var(--editor-text);
+}
+
+.editor-accent-button {
+  background: var(--editor-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--editor-accent) 65%, #ffffff 35%);
+  transition: filter 0.16s ease, transform 0.16s ease;
+}
+
+.editor-accent-button:hover {
+  filter: brightness(1.08);
+}
+
+.editor-theme .bg-white {
+  background-color: var(--editor-surface) !important;
+}
+
+.editor-theme .bg-gray-50 {
+  background-color: var(--editor-surface-muted) !important;
+}
+
+.editor-theme .border-gray-100,
+.editor-theme .border-gray-200 {
+  border-color: var(--editor-border) !important;
+}
+
+.editor-theme .text-gray-900,
+.editor-theme .text-gray-800,
+.editor-theme .text-gray-700,
+.editor-theme .text-gray-600 {
+  color: var(--editor-text) !important;
+}
+
+.editor-theme .text-gray-500,
+.editor-theme .text-gray-400,
+.editor-theme .text-gray-300 {
+  color: var(--editor-text-muted) !important;
+}
+
+.editor-theme .ProseMirror {
+  color: var(--editor-prose);
+}
+
+.editor-theme .ProseMirror h1,
+.editor-theme .ProseMirror h2,
+.editor-theme .ProseMirror h3,
+.editor-theme .ProseMirror h4,
+.editor-theme .ProseMirror p,
+.editor-theme .ProseMirror li {
+  color: var(--editor-prose);
+}
+
+.editor-theme-dark {
+  color-scheme: dark;
+}
+
+.editor-theme-dark .bg-gray-100 {
+  background-color: rgba(148, 163, 184, 0.12) !important;
+}
+
+.editor-theme-dark .bg-gray-200 {
+  background-color: rgba(148, 163, 184, 0.18) !important;
+}
+
+.editor-theme-dark .hover\:bg-gray-50:hover,
+.editor-theme-dark .hover\:bg-gray-100:hover,
+.editor-theme-dark .hover\:bg-gray-200:hover {
+  background-color: rgba(148, 163, 184, 0.24) !important;
+}
+
+.editor-theme-dark .hover\:text-red-600:hover {
+  color: #fda4af !important;
+}
+
+.editor-theme-dark .bg-indigo-50,
+.editor-theme-dark .bg-indigo-100 {
+  background-color: rgba(99, 102, 241, 0.2) !important;
+}
+
+.editor-theme-dark .text-indigo-700,
+.editor-theme-dark .text-indigo-600 {
+  color: #c7d2fe !important;
+}

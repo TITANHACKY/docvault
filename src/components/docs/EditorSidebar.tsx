@@ -1,6 +1,7 @@
 import { MessageSquare, Type, Sparkles, LayoutGrid, Download } from "lucide-react";
 import EditorSettingsPanel from "@/components/docs/EditorSettingsPanel";
 import type { StoredComment } from "@/lib/documents-types";
+import type { EditorTheme } from "@/lib/editor-themes";
 
 interface EditorStats {
     words: number;
@@ -11,6 +12,8 @@ interface EditorSidebarProps {
     activePanel: string | null;
     setActivePanel: (v: string | null | ((prev: string | null) => string | null)) => void;
     activePanelTitle: string;
+    theme: EditorTheme;
+    setTheme: (v: EditorTheme) => void;
     fontStyle: string;
     setFontStyle: (v: string) => void;
     fontSize: "small" | "default" | "large";
@@ -57,6 +60,8 @@ export default function EditorSidebar(props: EditorSidebarProps) {
                     activePanelTitle={props.activePanelTitle}
                     activePanel={props.activePanel}
                     onClose={() => props.setActivePanel(null)}
+                    theme={props.theme}
+                    setTheme={props.setTheme}
                     fontStyle={props.fontStyle}
                     setFontStyle={props.setFontStyle}
                     fontSize={props.fontSize}

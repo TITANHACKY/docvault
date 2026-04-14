@@ -227,7 +227,7 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
                 placeholder: ({ node }) => {
                     if (node.type.name === "heading") return `Heading ${node.attrs.level}`;
                     if (node.type.name === "callout") return "Type something in the callout...";
-                    return "Write, press 'space' for AI, '/' for commands";
+                    return " Write, press '/' for commands";
                 },
                 includeChildren: true,
             }),
@@ -835,14 +835,14 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
                         style={{ top: hoveredBlock.top, left: -44, transform: 'translateY(-50%)' }}
                     >
                         <button
-                            className="p-0.5 rounded hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors"
+                            className="editor-handle-btn p-0.5 rounded hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors"
                             title="Add block"
                             onMouseDown={(e) => { e.preventDefault(); handleAddBlock(); }}
                         >
                             <Plus size={18} />
                         </button>
                         <button
-                            className="p-0.5 rounded hover:bg-gray-100 text-gray-700 hover:text-gray-900 cursor-grab active:cursor-grabbing transition-colors"
+                            className="editor-handle-btn p-0.5 rounded hover:bg-gray-100 text-gray-700 hover:text-gray-900 cursor-grab active:cursor-grabbing transition-colors"
                             title="Drag to move"
                             onMouseDown={handleDragStart}
                         >
@@ -854,8 +854,8 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
                 {/* Drop indicator */}
                 {dropLineY !== null && (
                     <div
-                        className="absolute left-0 right-0 h-0.5 bg-blue-500 z-40 pointer-events-none"
-                        style={{ top: dropLineY }}
+                        className="absolute left-0 right-0 h-0.5 z-40 pointer-events-none"
+                        style={{ top: dropLineY, backgroundColor: "var(--editor-accent)" }}
                     />
                 )}
 
@@ -1383,7 +1383,7 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
                         }}
                     >
                         <button
-                            className="p-0.5 rounded hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors pointer-events-auto"
+                            className="editor-handle-btn p-0.5 rounded hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors pointer-events-auto"
                             title="Add block below table"
                             onMouseDown={(e) => {
                                 e.preventDefault();
@@ -1402,7 +1402,7 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
                             <Plus size={18} />
                         </button>
                         <button
-                            className="p-0.5 rounded hover:bg-gray-100 text-gray-700 hover:text-gray-900 cursor-grab active:cursor-grabbing transition-colors pointer-events-auto"
+                            className="editor-handle-btn p-0.5 rounded hover:bg-gray-100 text-gray-700 hover:text-gray-900 cursor-grab active:cursor-grabbing transition-colors pointer-events-auto"
                             title="Drag table"
                             onMouseDown={(e) => startBlockDrag(tableUi.tablePos, e)}
                         >
@@ -1411,7 +1411,7 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
                     </div>
 
                     <button
-                        className="absolute w-5 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 pointer-events-auto"
+                        className="editor-table-edge-btn absolute w-5 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 pointer-events-auto"
                         style={{
                             top: tableUi.surfaceTop,
                             left: tableUi.surfaceLeft + tableUi.surfaceWidth + 8,
@@ -1428,7 +1428,7 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
                     </button>
 
                     <button
-                        className="absolute h-4 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 pointer-events-auto"
+                        className="editor-table-edge-btn absolute h-4 rounded-md bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-800 pointer-events-auto"
                         style={{
                             top: tableUi.surfaceTop + tableUi.surfaceHeight + 6,
                             left: tableUi.surfaceLeft,

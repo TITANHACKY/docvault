@@ -16,7 +16,7 @@ import LinkExtension from "@tiptap/extension-link";
 import type { Editor as CoreEditor } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
 import { common, createLowlight } from "lowlight";
-import { Callout } from "@/features/editor/extensions/Callout";
+import { Callout } from "@/lib/Callout";
 import {
     Bold,
     Italic,
@@ -53,8 +53,8 @@ import {
     Pencil,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import SlashMenu from "./SlashMenu";
-import { getFlatItems, type SlashCommandItem } from "@/features/editor/commands/slash-commands";
+import SlashMenu from "@/components/SlashMenu";
+import { getFlatItems, type SlashCommandItem } from "@/lib/slash-commands";
 
 const lowlight = createLowlight(common);
 
@@ -112,7 +112,7 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, showOwners = true, 
                 placeholder: ({ node }) => {
                     if (node.type.name === "heading") return `Heading ${node.attrs.level}`;
                     if (node.type.name === "callout") return "Type something in the callout...";
-                    return "Write, press 'space' for AI, '/' for commands";
+                    return " Write, press '/' for commands";
                 },
                 includeChildren: true,
             }),
@@ -498,8 +498,8 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, showOwners = true, 
                 {/* Drop indicator */}
                 {dropLineY !== null && (
                     <div
-                        className="absolute left-0 right-0 h-0.5 bg-blue-500 z-40 pointer-events-none"
-                        style={{ top: dropLineY }}
+                        className="absolute left-0 right-0 h-0.5 z-40 pointer-events-none"
+                        style={{ top: dropLineY, backgroundColor: "var(--editor-accent)" }}
                     />
                 )}
 

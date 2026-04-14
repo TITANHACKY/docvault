@@ -13,8 +13,9 @@ import {
     Focus,
     ChevronsRight,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { StoredComment } from "@/lib/documents-types";
+import { editorThemes, type EditorTheme } from "@/lib/editor-themes";
 
 interface EditorStats {
     words: number;
@@ -25,6 +26,8 @@ interface EditorSettingsPanelProps {
     activePanelTitle: string;
     activePanel: string | null;
     onClose: () => void;
+    theme: EditorTheme;
+    setTheme: (v: EditorTheme) => void;
     fontStyle: string;
     setFontStyle: (v: string) => void;
     fontSize: "small" | "default" | "large";
@@ -111,6 +114,12 @@ function ToggleRow({
 
 export default function EditorSettingsPanel(props: EditorSettingsPanelProps) {
     const [commentDraft, setCommentDraft] = useState("");
+    const [themeFilter, setThemeFilter] = useState<"all" | "dark" | "light">("all");
+
+    const visibleThemes = useMemo(() => {
+        if (themeFilter === "all") return editorThemes;
+        return editorThemes.filter((themeOption) => themeOption.mode === themeFilter);
+    }, [themeFilter]);
 
     const fontOptions = [
         { key: "font-system", label: "System", preview: "Aa" },
@@ -203,6 +212,64 @@ export default function EditorSettingsPanel(props: EditorSettingsPanelProps) {
     const renderStylesPanel = () => {
         return (
             <>
+                <label className="text-xs font-medium text-gray-500 block mb-2">Theme</label>
+                <div className="mb-3 inline-flex items-center gap-1 rounded-lg border border-gray-200 p-1">
+                    {([
+                        { key: "all", label: "All" },
+                        { key: "dark", label: "Dark" },
+                        { key: "light", label: "Light" },
+                    ] as const).map((filterOption) => (
+                        <button
+                            key={filterOption.key}
+                            onClick={() => setThemeFilter(filterOption.key)}
+                            className={`rounded-md px-2.5 py-1 text-xs transition-colors ${themeFilter === filterOption.key
+                                ? "bg-gray-900 text-white"
+                                : "text-gray-600 hover:bg-gray-100"
+                                } cursor-pointer`}
+                            title={`Show ${filterOption.label.toLowerCase()} themes`}
+                        >
+                            {filterOption.label}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 mb-5">
+                    {visibleThemes.map((themeOption) => {
+                        const isActive = props.theme === themeOption.key;
+                        return (
+                            <button
+                                key={themeOption.key}
+                                onClick={() => props.setTheme(themeOption.key)}
+                                title={`Use ${themeOption.label} theme`}
+                                className={`rounded-xl border text-left transition-colors cursor-pointer ${isActive
+                                    ? "ring-2 ring-indigo-300"
+                                    : "hover:bg-gray-50"
+                                    }`}
+                                style={{
+                                    borderColor: themeOption.accent,
+                                    backgroundColor: themeOption.palette.surface,
+                                }}
+                            >
+                                <div
+                                    className="h-10 rounded-t-xl border-b"
+                                    style={{
+                                        backgroundColor: themeOption.palette.bg,
+                                        borderBottomColor: themeOption.palette.border,
+                                    }}
+                                />
+                                <div className="px-2 py-1.5">
+                                    <p className="text-[11px] font-semibold" style={{ color: themeOption.palette.text }}>
+                                        {themeOption.label}
+                                    </p>
+                                    <p className="text-[10px] uppercase tracking-wide" style={{ color: themeOption.palette.textMuted }}>
+                                        {themeOption.mode}
+                                    </p>
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+
                 <label className="text-xs font-medium text-gray-500 block mb-2">Font style</label>
                 <div className="grid grid-cols-3 gap-2 mb-5">
                     {fontOptions.map((f) => (

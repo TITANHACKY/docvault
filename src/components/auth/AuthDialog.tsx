@@ -1,22 +1,14 @@
-"use client";
-
-import Link from "next/link";
-import { useRouter } from "next/router";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useState } from "react";
 import { loginUser, registerUser } from "@/lib/auth-client";
 import { syncGuestDataToServer } from "@/lib/guest-sync";
-import {
-    getEditorTheme,
-    loadGlobalEditorTheme,
-    type EditorTheme,
-} from "@/lib/editor-themes";
 
-export default function LoginPage() {
-    const router = useRouter();
-    const [theme] = useState<EditorTheme>(() => {
-        if (typeof window === "undefined") return "notesnook-light";
-        return loadGlobalEditorTheme() ?? "notesnook-light";
-    });
+interface AuthDialogProps {
+    open: boolean;
+    onClose: () => void;
+    onSuccess?: () => void | Promise<void>;
+}
+
+export default function AuthDialog({ open, onClose, onSuccess }: AuthDialogProps) {
     const [mode, setMode] = useState<"login" | "register">("login");
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
@@ -24,23 +16,7 @@ export default function LoginPage() {
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const themeDefinition = useMemo(() => getEditorTheme(theme), [theme]);
-    const isDarkTheme = themeDefinition.mode === "dark";
-    const themeModeClass = isDarkTheme ? "editor-theme-dark" : "editor-theme-light";
-    const themeStyle = useMemo(
-        () =>
-        ({
-            "--editor-bg": themeDefinition.palette.bg,
-            "--editor-surface": themeDefinition.palette.surface,
-            "--editor-surface-muted": themeDefinition.palette.surfaceMuted,
-            "--editor-border": themeDefinition.palette.border,
-            "--editor-text": themeDefinition.palette.text,
-            "--editor-text-muted": themeDefinition.palette.textMuted,
-            "--editor-prose": themeDefinition.palette.prose,
-            "--editor-accent": themeDefinition.accent,
-        } as CSSProperties),
-        [themeDefinition],
-    );
+    if (!open) return null;
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -62,11 +38,10 @@ export default function LoginPage() {
             }
 
             await syncGuestDataToServer();
-
-            await router.replace("/docs");
+            await onSuccess?.();
+            onClose();
         } catch (submitError) {
-            const message =
-                submitError instanceof Error ? submitError.message : "Authentication failed";
+            const message = submitError instanceof Error ? submitError.message : "Authentication failed";
             setError(message);
         } finally {
             setIsSubmitting(false);
@@ -74,15 +49,24 @@ export default function LoginPage() {
     };
 
     return (
-        <main className={`editor-theme ${themeModeClass} flex min-h-screen items-center justify-center bg-gray-50 px-4`} style={themeStyle}>
-            <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h1 className="text-2xl font-semibold text-gray-900">
-                    {mode === "login" ? "Welcome back" : "Create your account"}
-                </h1>
+        <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/55 px-4" role="dialog" aria-modal="true">
+            <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-xl">
+                <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900">
+                        {mode === "login" ? "Welcome back" : "Create your account"}
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
+                        title="Close sign in dialog"
+                    >
+                        Close
+                    </button>
+                </div>
+
                 <p className="mt-1 text-sm text-gray-500">
-                    {mode === "login"
-                        ? "Sign in to access your documents."
-                        : "Register to start writing and saving documents."}
+                    {mode === "login" ? "Sign in to sync your documents." : "Create an account to sync your work."}
                 </p>
 
                 <form className="mt-5 space-y-3" onSubmit={handleSubmit}>
@@ -93,7 +77,7 @@ export default function LoginPage() {
                                 value={name}
                                 onChange={(event) => setName(event.target.value)}
                                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-400"
-                                placeholder="Poonkawin"
+                                placeholder="Your name"
                             />
                         </label>
                     )}
@@ -124,9 +108,7 @@ export default function LoginPage() {
                     </label>
 
                     {error && (
-                        <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                            {error}
-                        </p>
+                        <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
                     )}
 
                     <button
@@ -134,28 +116,20 @@ export default function LoginPage() {
                         disabled={isSubmitting}
                         className="editor-accent-button mt-1 w-full cursor-pointer rounded-lg px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        {isSubmitting
-                            ? "Please wait..."
-                            : mode === "login"
-                                ? "Sign in"
-                                : "Create account"}
+                        {isSubmitting ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"}
                     </button>
                 </form>
 
-                <div className="mt-4 flex items-center justify-between text-sm">
+                <div className="mt-4 text-sm">
                     <button
                         type="button"
                         onClick={() => setMode((previous) => (previous === "login" ? "register" : "login"))}
-                        className="cursor-pointer text-indigo-600 hover:text-indigo-500"
+                        className="text-indigo-600 hover:text-indigo-500"
                     >
                         {mode === "login" ? "Need an account? Register" : "Already have an account? Sign in"}
                     </button>
-
-                    <Link href="/" className="text-gray-500 hover:text-gray-700">
-                        Home
-                    </Link>
                 </div>
             </div>
-        </main>
+        </div>
     );
 }
