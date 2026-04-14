@@ -32,8 +32,11 @@ export async function listDocuments(): Promise<StoredDocument[]> {
   return payload.documents;
 }
 
-export async function getDocument(id: string): Promise<StoredDocument | null> {
-  const response = await fetch(`/api/documents/${id}`);
+export async function getDocument(
+  id: string,
+  init?: RequestInit,
+): Promise<StoredDocument | null> {
+  const response = await fetch(`/api/documents/${id}`, init);
   if (response.status === 404) return null;
   if (!response.ok) {
     throw new Error(`Failed to fetch document ${id}`);
@@ -56,12 +59,14 @@ export async function createDocument(): Promise<StoredDocument> {
 
 export async function upsertDocument(
   document: StoredDocument,
+  init?: RequestInit,
 ): Promise<StoredDocument> {
   const payload = await requestJson<{ document: StoredDocument }>(
     `/api/documents/${document.id}`,
     {
       method: "PUT",
       body: JSON.stringify(document),
+      ...init,
     },
   );
   return payload.document;

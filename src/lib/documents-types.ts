@@ -12,6 +12,7 @@ export interface StoredDocument {
   content: string;
   pages: StoredPage[];
   activePageId: string;
+  ownerId?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -19,6 +20,7 @@ export interface StoredDocument {
 export interface StoredComment {
   id: string;
   documentId: string;
+  userId?: string;
   content: string;
   author: string;
   createdAt: number;

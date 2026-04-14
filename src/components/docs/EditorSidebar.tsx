@@ -43,10 +43,12 @@ interface EditorSidebarProps {
     onAddComment: (content: string) => Promise<void>;
     isAddingComment: boolean;
     onExport: (format: "markdown" | "text") => void;
+    disabledPanelIds?: string[];
 }
 
 export default function EditorSidebar(props: EditorSidebarProps) {
     const isPanelOpen = props.activePanel !== null;
+    const disabledPanelIds = props.disabledPanelIds ?? [];
 
     return (
         <div className="flex shrink-0">
@@ -97,18 +99,27 @@ export default function EditorSidebar(props: EditorSidebarProps) {
                     { id: "ai", icon: Sparkles },
                     { id: "templates", icon: LayoutGrid },
                     { id: "export", icon: Download },
-                ].map((item) => (
-                    <button
-                        key={item.id}
-                        onClick={() => props.setActivePanel((prev) => (prev === item.id ? null : item.id))}
-                        className={`p-1.5 rounded-md transition-colors ${props.activePanel === item.id
-                            ? "bg-indigo-100 text-indigo-600"
-                            : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-                            }`}
-                    >
-                        <item.icon size={17} />
-                    </button>
-                ))}
+                ].map((item) => {
+                    const isDisabled = disabledPanelIds.includes(item.id);
+                    return (
+                        <button
+                            key={item.id}
+                            onClick={() => {
+                                if (isDisabled) return;
+                                props.setActivePanel((prev) => (prev === item.id ? null : item.id));
+                            }}
+                            title={isDisabled ? `Available after sign in` : `Open ${item.id} panel`}
+                            disabled={isDisabled}
+                            className={`p-1.5 rounded-md transition-colors ${props.activePanel === item.id
+                                ? "bg-indigo-100 text-indigo-600"
+                                : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                                } cursor-pointer disabled:cursor-not-allowed disabled:opacity-40`}
+                        >
+                            <item.icon size={17} />
+                        </button>
+                    );
+                }
+                )}
             </div>
         </div>
     );

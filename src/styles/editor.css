@@ -94,7 +94,7 @@
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  color: #d1d5db;
+  color: #6b7280;
   pointer-events: none;
   height: 0;
 }
@@ -103,7 +103,7 @@
 .ProseMirror .is-empty::before {
   content: attr(data-placeholder);
   float: left;
-  color: #e9eaec;
+  color: #6b7280;
   pointer-events: none;
   height: 0;
   font-weight: normal;
@@ -117,7 +117,7 @@
 
 .ProseMirror ul[data-type="taskList"] li {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.5rem;
   margin: 0.25rem 0;
 }
@@ -125,7 +125,7 @@
 .ProseMirror ul[data-type="taskList"] li>label {
   flex-shrink: 0;
   user-select: none;
-  margin-top: 0.25rem;
+  margin-top: 0;
 }
 
 .ProseMirror ul[data-type="taskList"] li>label input[type="checkbox"] {
@@ -165,8 +165,8 @@
 /* Table styles */
 .ProseMirror table {
   border-collapse: collapse;
-  margin: 0.75rem 0;
-  overflow: hidden;
+  margin: 0;
+  overflow: visible;
   table-layout: fixed;
   width: 100%;
 }
@@ -176,6 +176,7 @@
   border: 1px solid #d1d5db;
   min-width: 1em;
   padding: 0.5rem 0.75rem;
+  position: relative;
   vertical-align: top;
 }
 
@@ -186,8 +187,34 @@
 }
 
 .ProseMirror .tableWrapper {
-  margin: 0.75rem 0;
+  margin: 0.25rem 0;
   overflow-x: auto;
+  padding-right: 6px;
+}
+
+/* TipTap table column resize affordances */
+.ProseMirror .column-resize-handle {
+  background-color: #2563eb;
+  bottom: -1px;
+  position: absolute;
+  right: -4px;
+  pointer-events: none;
+  top: 0;
+  width: 2px;
+  z-index: 3;
+}
+
+.ProseMirror.resize-cursor {
+  cursor: col-resize;
+}
+
+.ProseMirror .selectedCell::after {
+  background: rgba(37, 99, 235, 0.08);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
 }
 
 .ProseMirror .action-button-block {

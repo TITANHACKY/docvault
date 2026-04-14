@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/router";
-import { ChevronsLeft, FileText, GitBranch, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, ChevronsLeft, FileText, GitBranch, Plus, Trash2 } from "lucide-react";
 import TiptapEditor from "@/components/Editor";
 import EditorSidebar from "@/components/docs/EditorSidebar";
 import {
@@ -14,10 +15,32 @@ import {
   type StoredPage,
 } from "@/lib/documents";
 import { downloadTextFile, htmlToMarkdown, htmlToPlainText } from "@/lib/export";
+import {
+  loadEncryptedDraft,
+  saveEncryptedDraft,
+  type EditorDraftPayload,
+} from "@/lib/local-draft";
+import ToastRegion, { type ToastMessage } from "@/components/ui/ToastRegion";
+import { getCurrentUser, logoutUser } from "@/lib/auth-client";
+import {
+  addGuestComment,
+  createGuestDocument,
+  getGuestDocument,
+  listGuestComments,
+  upsertGuestDocument,
+} from "@/lib/guest-documents";
+import {
+  loadEditorPreferences,
+  saveEditorPreferences,
+} from "@/lib/editor-preferences";
 
 interface EditorStats {
   words: number;
   characters: number;
+}
+
+function sanitizePageLinks(html: string): string {
+  return html.replace(/href="\/docs\/[^"]*\?page=([^"]+)"/g, 'href="?page=$1"');
 }
 
 function createPage(title = "Untitled"): StoredPage {
@@ -29,6 +52,52 @@ function createPage(title = "Untitled"): StoredPage {
     createdAt: now,
     updatedAt: now,
   };
+}
+
+function isValidDraftPage(page: Partial<StoredPage>): page is StoredPage {
+  return (
+    typeof page?.id === "string" &&
+    typeof page?.title === "string" &&
+    typeof page?.content === "string" &&
+    typeof page?.createdAt === "number" &&
+    typeof page?.updatedAt === "number"
+  );
+}
+
+function sanitizeDraft(input: EditorDraftPayload): EditorDraftPayload | null {
+  const validPages = input.pages.filter((page) => isValidDraftPage(page));
+  if (validPages.length === 0) return null;
+
+  const hasActivePage = validPages.some((page) => page.id === input.activePageId);
+  return {
+    title: input.title,
+    pages: validPages,
+    activePageId: hasActivePage ? input.activePageId : validPages[0].id,
+    updatedAt: input.updatedAt,
+  };
+}
+
+function mergePagesByUpdatedAt(
+  remotePages: StoredPage[],
+  localPages: StoredPage[],
+): StoredPage[] {
+  const merged = new Map<string, StoredPage>();
+
+  remotePages.forEach((page) => {
+    merged.set(page.id, page);
+  });
+
+  localPages.forEach((localPage) => {
+    const remotePage = merged.get(localPage.id);
+    if (!remotePage || localPage.updatedAt >= remotePage.updatedAt) {
+      merged.set(localPage.id, localPage);
+      return;
+    }
+
+    merged.set(localPage.id, remotePage);
+  });
+
+  return [...merged.values()].sort((a, b) => a.createdAt - b.createdAt);
 }
 
 export default function DocEditorPage() {
@@ -62,6 +131,116 @@ export default function DocEditorPage() {
   const [comments, setComments] = useState<StoredComment[]>([]);
   const [isAddingComment, setIsAddingComment] = useState(false);
   const [activePanel, setActivePanel] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [isOnline, setIsOnline] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isGuestMode, setIsGuestMode] = useState(false);
+
+  const saveAbortControllerRef = useRef<AbortController | null>(null);
+  const latestSaveTokenRef = useRef(0);
+  const lastSyncedServerUpdatedAtRef = useRef(0);
+
+  const pushToast = useCallback((tone: ToastMessage["tone"], message: string) => {
+    setToasts((previous) => [
+      ...previous,
+      { id: crypto.randomUUID(), tone, message },
+    ]);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((previous) => previous.filter((toast) => toast.id !== id));
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const syncOnlineState = () => {
+      setIsOnline(window.navigator.onLine);
+    };
+
+    syncOnlineState();
+    window.addEventListener("online", syncOnlineState);
+    window.addEventListener("offline", syncOnlineState);
+
+    return () => {
+      window.removeEventListener("online", syncOnlineState);
+      window.removeEventListener("offline", syncOnlineState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!docId) return;
+
+    const timeout = window.setTimeout(() => {
+      const prefs = loadEditorPreferences(docId);
+      if (!prefs) return;
+
+      if (typeof prefs.fontStyle === "string") setFontStyle(prefs.fontStyle);
+      if (prefs.fontSize === "small" || prefs.fontSize === "default" || prefs.fontSize === "large") {
+        setFontSize(prefs.fontSize);
+      }
+      if (prefs.pageWidth === "default" || prefs.pageWidth === "full") {
+        setPageWidth(prefs.pageWidth);
+      }
+      if (typeof prefs.coverImage === "boolean") setCoverImage(prefs.coverImage);
+      if (typeof prefs.pageIconTitle === "boolean") setPageIconTitle(prefs.pageIconTitle);
+      if (typeof prefs.owners === "boolean") setOwners(prefs.owners);
+      if (typeof prefs.contributors === "boolean") setContributors(prefs.contributors);
+      if (typeof prefs.subtitle === "boolean") setSubtitle(prefs.subtitle);
+      if (typeof prefs.lastModified === "boolean") setLastModified(prefs.lastModified);
+      if (typeof prefs.pageOutline === "boolean") setPageOutline(prefs.pageOutline);
+      if (typeof prefs.focusBlock === "boolean") setFocusBlock(prefs.focusBlock);
+      if (typeof prefs.focusPage === "boolean") setFocusPage(prefs.focusPage);
+      if (typeof prefs.showStatsOnPage === "boolean") setShowStatsOnPage(prefs.showStatsOnPage);
+      if (typeof prefs.isPagesSidebarOpen === "boolean") {
+        setIsPagesSidebarOpen(prefs.isPagesSidebarOpen);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
+  }, [docId]);
+
+  useEffect(() => {
+    if (!docId) return;
+
+    const timeout = window.setTimeout(() => {
+      saveEditorPreferences(docId, {
+        fontStyle,
+        fontSize,
+        pageWidth,
+        coverImage,
+        pageIconTitle,
+        owners,
+        contributors,
+        subtitle,
+        lastModified,
+        pageOutline,
+        focusBlock,
+        focusPage,
+        showStatsOnPage,
+        isPagesSidebarOpen,
+      });
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    docId,
+    fontStyle,
+    fontSize,
+    pageWidth,
+    coverImage,
+    pageIconTitle,
+    owners,
+    contributors,
+    subtitle,
+    lastModified,
+    pageOutline,
+    focusBlock,
+    focusPage,
+    showStatsOnPage,
+    isPagesSidebarOpen,
+  ]);
 
   const activePage = useMemo(() => {
     if (!activePageId) return pages[0] ?? null;
@@ -73,55 +252,103 @@ export default function DocEditorPage() {
 
     const timeout = setTimeout(() => {
       void (async () => {
-        const existingDocument = await getDocument(docId);
+        const user = await getCurrentUser().catch(() => null);
+        setIsGuestMode(!user);
+        setAuthChecked(true);
 
-        if (existingDocument) {
-          const normalizedPages =
-            existingDocument.pages.length > 0
-              ? existingDocument.pages
-              : [
-                {
-                  id: crypto.randomUUID(),
-                  title: existingDocument.title || "Untitled",
-                  content: existingDocument.content || "<p></p>",
-                  createdAt: existingDocument.createdAt,
-                  updatedAt: existingDocument.updatedAt,
-                },
-              ];
+        try {
+          const existingDocument = user
+            ? await getDocument(docId)
+            : await getGuestDocument(docId);
+          const localDraft = await loadEncryptedDraft(docId);
 
-          setDocumentTitle(existingDocument.title || "Doc");
-          setPages(normalizedPages);
-          setActivePageId(
-            normalizedPages.some((page) => page.id === existingDocument.activePageId)
-              ? existingDocument.activePageId
-              : normalizedPages[0].id,
-          );
+          if (existingDocument) {
+            const normalizedPages =
+              existingDocument.pages.length > 0
+                ? existingDocument.pages
+                : [
+                  {
+                    id: crypto.randomUUID(),
+                    title: existingDocument.title || "Untitled",
+                    content: existingDocument.content || "<p></p>",
+                    createdAt: existingDocument.createdAt,
+                    updatedAt: existingDocument.updatedAt,
+                  },
+                ];
+
+            const sanitizedPages = normalizedPages.map((page) => ({
+              ...page,
+              content: sanitizePageLinks(page.content),
+            }));
+
+            const validDraft = localDraft ? sanitizeDraft(localDraft) : null;
+            const shouldRestoreDraft =
+              validDraft !== null && validDraft.updatedAt > existingDocument.updatedAt;
+
+            const finalTitle = shouldRestoreDraft ? validDraft.title : existingDocument.title || "Doc";
+            const finalPages = shouldRestoreDraft
+              ? validDraft.pages
+              : sanitizedPages;
+            const finalActivePageId = shouldRestoreDraft
+              ? validDraft.activePageId
+              : sanitizedPages.some((page) => page.id === existingDocument.activePageId)
+                ? existingDocument.activePageId
+                : sanitizedPages[0].id;
+
+            setDocumentTitle(finalTitle || "Doc");
+            setPages(finalPages);
+            setActivePageId(finalActivePageId);
+            lastSyncedServerUpdatedAtRef.current = existingDocument.updatedAt;
+            setIsDocumentReady(true);
+
+            if (shouldRestoreDraft) {
+              pushToast("info", "Restored newer local draft");
+            }
+
+            return;
+          }
+
+          const now = Date.now();
+          const firstPage = createPage("Untitled");
+
+          if (user) {
+            await upsertDocument({
+              id: docId,
+              title: "Doc",
+              content: firstPage.content,
+              pages: [firstPage],
+              activePageId: firstPage.id,
+              createdAt: now,
+              updatedAt: now,
+            });
+          } else {
+            await createGuestDocument({
+              id: docId,
+              title: "Doc",
+              content: firstPage.content,
+            });
+          }
+
+          setDocumentTitle("Doc");
+          setPages([firstPage]);
+          setActivePageId(firstPage.id);
+          lastSyncedServerUpdatedAtRef.current = now;
           setIsDocumentReady(true);
-          return;
+          pushToast("success", "Document initialized");
+        } catch {
+          setSaveState("error");
+          pushToast("error", "Unable to load document");
         }
-
-        const now = Date.now();
-        const firstPage = createPage("Untitled");
-
-        await upsertDocument({
-          id: docId,
-          title: "Doc",
-          content: firstPage.content,
-          pages: [firstPage],
-          activePageId: firstPage.id,
-          createdAt: now,
-          updatedAt: now,
-        });
-
-        setDocumentTitle("Doc");
-        setPages([firstPage]);
-        setActivePageId(firstPage.id);
-        setIsDocumentReady(true);
       })();
     }, 0);
 
     return () => clearTimeout(timeout);
-  }, [docId]);
+  }, [docId, pushToast, router]);
+
+  const handleLogout = useCallback(async () => {
+    await logoutUser();
+    await router.replace("/login");
+  }, [router]);
 
   useEffect(() => {
     const pageFromQuery = typeof router.query.page === "string" ? router.query.page : null;
@@ -146,40 +373,145 @@ export default function DocEditorPage() {
   }, [docId, activePageId, router]);
 
   useEffect(() => {
-    if (!docId || !isDocumentReady || pages.length === 0 || !activePage) return;
+    if (!authChecked || !docId || !isDocumentReady || pages.length === 0 || !activePage) return;
 
-    const timeout = setTimeout(() => {
-      void (async () => {
-        const existingDocument = await getDocument(docId);
-        const now = Date.now();
+    const timeout = window.setTimeout(() => {
+      const payload: EditorDraftPayload = {
+        title: documentTitle.trim() || "Doc",
+        pages,
+        activePageId: activePage.id,
+        updatedAt: Date.now(),
+      };
 
-        await upsertDocument({
-          id: docId,
-          title: documentTitle.trim() || "Doc",
-          content: activePage.content,
-          pages,
-          activePageId: activePage.id,
-          createdAt: existingDocument?.createdAt ?? now,
-          updatedAt: now,
-        });
-      })();
-    }, 400);
+      void saveEncryptedDraft(docId, payload);
+    }, 250);
 
-    return () => clearTimeout(timeout);
-  }, [docId, documentTitle, pages, activePage, isDocumentReady]);
+    return () => window.clearTimeout(timeout);
+  }, [authChecked, docId, documentTitle, pages, activePage, isDocumentReady]);
 
   useEffect(() => {
-    if (!docId) return;
+    if (!docId || !isDocumentReady || pages.length === 0 || !activePage) return;
+
+    const timeout = window.setTimeout(() => {
+      const thisSaveToken = latestSaveTokenRef.current + 1;
+      latestSaveTokenRef.current = thisSaveToken;
+
+      if (saveAbortControllerRef.current) {
+        saveAbortControllerRef.current.abort();
+      }
+
+      const controller = new AbortController();
+      saveAbortControllerRef.current = controller;
+
+      const localTitle = documentTitle.trim() || "Doc";
+      const localPages = pages;
+      const localActivePage = activePage;
+      const now = Date.now();
+
+      if (isGuestMode) {
+        const now = Date.now();
+        void upsertGuestDocument({
+          id: docId,
+          title: localTitle,
+          content: localActivePage.content,
+          pages: localPages,
+          activePageId: localActivePage.id,
+          createdAt: now,
+          updatedAt: now,
+        });
+        setSaveState("saved");
+        return;
+      }
+
+      if (!isOnline) {
+        setSaveState("idle");
+        return;
+      }
+
+      setSaveState("saving");
+
+      void (async () => {
+        try {
+          const remoteDocument = await getDocument(docId, { signal: controller.signal });
+          if (controller.signal.aborted || latestSaveTokenRef.current !== thisSaveToken) return;
+
+          const shouldMerge =
+            remoteDocument !== null &&
+            remoteDocument.updatedAt > lastSyncedServerUpdatedAtRef.current;
+
+          const mergedPages = shouldMerge
+            ? mergePagesByUpdatedAt(remoteDocument.pages, localPages)
+            : localPages;
+
+          const safeActivePageId = mergedPages.some((page) => page.id === localActivePage.id)
+            ? localActivePage.id
+            : mergedPages[0]?.id ?? localActivePage.id;
+          const mergedActivePage =
+            mergedPages.find((page) => page.id === safeActivePageId) ?? mergedPages[0] ?? localActivePage;
+
+          const saved = await upsertDocument(
+            {
+              id: docId,
+              title: localTitle,
+              content: mergedActivePage.content,
+              pages: mergedPages,
+              activePageId: safeActivePageId,
+              createdAt: remoteDocument?.createdAt ?? now,
+              updatedAt: now,
+            },
+            { signal: controller.signal },
+          );
+
+          if (controller.signal.aborted || latestSaveTokenRef.current !== thisSaveToken) return;
+
+          lastSyncedServerUpdatedAtRef.current = saved.updatedAt;
+          setSaveState("saved");
+        } catch (error) {
+          const isAbort =
+            error instanceof DOMException && error.name === "AbortError";
+          if (isAbort) return;
+
+          setSaveState("error");
+          pushToast("error", "Autosave failed");
+        }
+      })();
+    }, 700);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    authChecked,
+    docId,
+    documentTitle,
+    pages,
+    activePage,
+    isDocumentReady,
+    pushToast,
+    isOnline,
+    isGuestMode,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (saveAbortControllerRef.current) {
+        saveAbortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!authChecked || !docId) return;
 
     const timeout = setTimeout(() => {
       void (async () => {
-        const nextComments = await listComments(docId);
+        const nextComments = isGuestMode
+          ? await listGuestComments(docId)
+          : await listComments(docId);
         setComments(nextComments);
       })();
     }, 0);
 
     return () => clearTimeout(timeout);
-  }, [docId]);
+  }, [authChecked, docId, isGuestMode]);
 
   const fontSizeClass =
     fontSize === "small" ? "editor-text-sm" : fontSize === "large" ? "editor-text-lg" : "";
@@ -202,18 +534,30 @@ export default function DocEditorPage() {
     return panelMap[activePanel ?? "styles"] ?? "Page Styles";
   }, [activePanel]);
 
+  useEffect(() => {
+    if (!isGuestMode) return;
+    if (activePanel === "ai" || activePanel === "templates") {
+      setActivePanel(null);
+    }
+  }, [isGuestMode, activePanel]);
+
   const handleAddComment = useCallback(
     async (commentContent: string) => {
-      if (!docId) return;
+      if (!authChecked || !docId) return;
       setIsAddingComment(true);
       try {
-        const comment = await addComment(docId, commentContent, "You");
+        const comment = isGuestMode
+          ? await addGuestComment(docId, commentContent, "Guest")
+          : await addComment(docId, commentContent, "You");
         setComments((previous) => [...previous, comment]);
+        pushToast("success", "Comment added");
+      } catch {
+        pushToast("error", "Could not add comment");
       } finally {
         setIsAddingComment(false);
       }
     },
-    [docId],
+    [authChecked, docId, isGuestMode, pushToast],
   );
 
   const handleExport = useCallback(
@@ -244,12 +588,16 @@ export default function DocEditorPage() {
 
       setPages((previous) => [...previous, nextPage]);
       setIsPagesSidebarOpen(true);
+      pushToast("success", "Page created");
     },
-    [],
+    [pushToast],
   );
 
   const handleDeletePage = useCallback(
     (pageId: string) => {
+      const confirmed = window.confirm("Delete this page permanently?");
+      if (!confirmed) return;
+
       setPages((previous) => {
         if (previous.length <= 1) return previous;
 
@@ -266,8 +614,10 @@ export default function DocEditorPage() {
 
         return filtered;
       });
+
+      pushToast("success", "Page deleted");
     },
-    [activePageId],
+    [activePageId, pushToast],
   );
 
   const mentionPages = useMemo(
@@ -319,13 +669,15 @@ export default function DocEditorPage() {
   if (!activePage) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-white text-gray-500">
-        Loading document...
+        {authChecked ? "Loading document..." : "Checking session..."}
       </main>
     );
   }
 
   return (
     <main className="flex min-h-screen bg-white">
+      <ToastRegion toasts={toasts} onDismiss={dismissToast} />
+
       {isPagesSidebarOpen ? (
         <aside className="hidden w-72 shrink-0 border-r border-gray-200 bg-gray-50 lg:block">
           <div className="flex items-center justify-between border-b border-gray-200 px-4 py-4">
@@ -338,8 +690,9 @@ export default function DocEditorPage() {
             />
             <button
               onClick={() => setIsPagesSidebarOpen(false)}
-              className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100"
+              className="cursor-pointer rounded-md p-1.5 text-gray-500 hover:bg-gray-100"
               aria-label="Collapse pages sidebar"
+              title="Collapse pages sidebar"
             >
               <ChevronsLeft size={16} />
             </button>
@@ -354,8 +707,9 @@ export default function DocEditorPage() {
                   <li key={page.id} className="group flex items-center gap-1">
                     <button
                       onClick={() => setActivePageId(page.id)}
-                      className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${isActive ? "bg-gray-200 text-gray-900" : "text-gray-600 hover:bg-gray-100"
+                      className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${isActive ? "bg-gray-200 text-gray-900" : "text-gray-600 hover:bg-gray-100"
                         }`}
+                      title={`Open page ${page.title || "Untitled"}`}
                     >
                       <FileText size={16} />
                       <span className="truncate">{page.title || "Untitled"}</span>
@@ -363,8 +717,9 @@ export default function DocEditorPage() {
 
                     <button
                       onClick={() => handleDeletePage(page.id)}
-                      className="rounded-md p-1.5 text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-red-600 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="cursor-pointer rounded-md p-1.5 text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-red-600 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
                       aria-label={`Delete page ${page.title || "Untitled"}`}
+                      title={`Delete page ${page.title || "Untitled"}`}
                       disabled={pages.length <= 1}
                     >
                       <Trash2 size={14} />
@@ -376,7 +731,8 @@ export default function DocEditorPage() {
 
             <button
               onClick={() => handleCreatePage()}
-              className="mt-2 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-500 hover:bg-gray-100"
+              className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-500 hover:bg-gray-100"
+              title="Create a new page"
             >
               <Plus size={16} />
               Add page
@@ -386,21 +742,75 @@ export default function DocEditorPage() {
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="px-4 pt-4">
-          {!isPagesSidebarOpen && (
-            <button
-              onClick={() => setIsPagesSidebarOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 shadow-sm hover:bg-gray-50"
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4">
+          <div className="flex min-w-0 items-center gap-2">
+            <Link
+              href="/docs"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+              title="Back to all documents"
             >
-              <FileText size={16} />
-              {pages.length > 1 ? `${pages.length} pages` : "Add page"}
-            </button>
-          )}
+              <ArrowLeft size={16} />
+              All docs
+            </Link>
+
+            {!isPagesSidebarOpen && (
+              <button
+                onClick={() => setIsPagesSidebarOpen(true)}
+                className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                title="Open pages sidebar"
+              >
+                <FileText size={16} />
+                {pages.length > 1 ? `${pages.length} pages` : "Add page"}
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs text-gray-500">
+              <span
+                className={`h-2 w-2 rounded-full ${isOnline ? "bg-emerald-500" : "bg-amber-500"}`}
+                title={isOnline ? "Network is online" : "Network is offline"}
+              />
+              <span>{isOnline ? "Online" : "Offline"}</span>
+              <span className="text-gray-300">|</span>
+              <span title="Document save status">
+                {!isOnline
+                  ? "Local draft"
+                  : saveState === "saving"
+                    ? "Saving"
+                    : saveState === "error"
+                      ? "Save failed"
+                      : "Saved"}
+              </span>
+            </div>
+
+            {isGuestMode ? (
+              <button
+                onClick={() => {
+                  void router.push("/login");
+                }}
+                className="inline-flex cursor-pointer items-center rounded-xl bg-gray-900 px-3 py-2 text-sm text-white hover:bg-gray-800"
+                title="Sign in to sync this document"
+              >
+                Sign in
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  void handleLogout();
+                }}
+                className="inline-flex cursor-pointer items-center rounded-xl px-3 py-2 text-sm text-gray-500 hover:bg-gray-100"
+                title="Sign out"
+              >
+                Sign out
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-1 justify-center px-8 pb-4 pt-8">
           <div className={`w-full ${pageWidth === "full" ? "max-w-none px-8" : "max-w-3xl"}`}>
-            <div className="mb-8 flex w-fit cursor-pointer items-center gap-2 text-sm text-gray-400">
+            <div className="mb-8 flex w-fit items-center gap-2 text-sm text-gray-400">
               <GitBranch size={16} className="rotate-90" />
               <span className="font-medium">Link Task or Doc</span>
             </div>
@@ -464,6 +874,7 @@ export default function DocEditorPage() {
         onAddComment={handleAddComment}
         isAddingComment={isAddingComment}
         onExport={handleExport}
+        disabledPanelIds={isGuestMode ? ["ai", "templates"] : []}
       />
     </main>
   );

@@ -1,230 +1,115 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
-import type {
-  StoredComment,
-  StoredDocument,
-  StoredPage,
-} from "@/lib/documents-types";
+import type { StoredComment, StoredDocument } from "@/lib/documents-types";
+import {
+  addCommentPrisma,
+  createDocumentPrisma,
+  deleteDocumentPrisma,
+  getDocumentPrisma,
+  listCommentsPrisma,
+  listDocumentsPrisma,
+  upsertDocumentPrisma,
+} from "@/lib/server/document-store-prisma";
+import {
+  addCommentFile,
+  createDocumentFile,
+  deleteDocumentFile,
+  getDocumentFile,
+  listCommentsFile,
+  listDocumentsFile,
+  upsertDocumentFile,
+} from "@/lib/server/document-store-file";
 
-interface StoredDatabase {
-  documents: StoredDocument[];
-  commentsByDocumentId: Record<string, StoredComment[]>;
+const STORAGE_MODE = process.env.DOC_STORE_MODE?.toLowerCase() ?? "file";
+
+function isPostgresStore(): boolean {
+  // `prisma` is kept as a backward-compatible alias for existing environments.
+  return (
+    STORAGE_MODE === "postgres" ||
+    STORAGE_MODE === "postgresql" ||
+    STORAGE_MODE === "prisma"
+  );
 }
 
-const DB_DIR = path.join(process.cwd(), "data");
-const DB_PATH = path.join(DB_DIR, "doc-editor-db.json");
-
-function defaultDb(): StoredDatabase {
-  return {
-    documents: [],
-    commentsByDocumentId: {},
-  };
-}
-
-function createDefaultPage(now: number): StoredPage {
-  return {
-    id: randomUUID(),
-    title: "Untitled",
-    content: "<p></p>",
-    createdAt: now,
-    updatedAt: now,
-  };
-}
-
-function normalizeDocument(input: Partial<StoredDocument>): StoredDocument {
-  const now = Date.now();
-
-  const pages = Array.isArray(input.pages)
-    ? input.pages
-        .filter((page): page is StoredPage => {
-          return (
-            typeof page?.id === "string" &&
-            typeof page?.title === "string" &&
-            typeof page?.content === "string" &&
-            typeof page?.createdAt === "number" &&
-            typeof page?.updatedAt === "number"
-          );
-        })
-        .map((page) => ({ ...page }))
-    : [];
-
-  if (pages.length === 0) {
-    const migratedPage: StoredPage = {
-      id: randomUUID(),
-      title:
-        typeof input.title === "string" && input.title.trim()
-          ? input.title
-          : "Untitled",
-      content: typeof input.content === "string" ? input.content : "<p></p>",
-      createdAt: typeof input.createdAt === "number" ? input.createdAt : now,
-      updatedAt: typeof input.updatedAt === "number" ? input.updatedAt : now,
-    };
-    pages.push(migratedPage);
+export async function listDocumentsDb(
+  userId?: string,
+): Promise<StoredDocument[]> {
+  if (isPostgresStore()) {
+    if (!userId) return [];
+    return listDocumentsPrisma(userId);
   }
-
-  const activePageId =
-    typeof input.activePageId === "string" &&
-    pages.some((page) => page.id === input.activePageId)
-      ? input.activePageId
-      : pages[0].id;
-
-  const activePage = pages.find((page) => page.id === activePageId) ?? pages[0];
-
-  return {
-    id:
-      typeof input.id === "string" && input.id.length > 0
-        ? input.id
-        : randomUUID(),
-    title:
-      typeof input.title === "string" && input.title.trim()
-        ? input.title
-        : activePage.title || "Untitled",
-    content:
-      typeof input.content === "string" ? input.content : activePage.content,
-    pages,
-    activePageId,
-    createdAt: typeof input.createdAt === "number" ? input.createdAt : now,
-    updatedAt: typeof input.updatedAt === "number" ? input.updatedAt : now,
-  };
-}
-
-async function ensureDbFile() {
-  await mkdir(DB_DIR, { recursive: true });
-
-  try {
-    await readFile(DB_PATH, "utf-8");
-  } catch {
-    await writeFile(DB_PATH, JSON.stringify(defaultDb(), null, 2), "utf-8");
-  }
-}
-
-async function readDb(): Promise<StoredDatabase> {
-  await ensureDbFile();
-
-  try {
-    const raw = await readFile(DB_PATH, "utf-8");
-    const parsed = JSON.parse(raw) as Partial<StoredDatabase>;
-    const documents = Array.isArray(parsed.documents)
-      ? (parsed.documents as unknown[])
-          .filter(
-            (doc): doc is Partial<StoredDocument> =>
-              typeof doc === "object" && doc !== null,
-          )
-          .map((doc) => normalizeDocument(doc))
-      : [];
-
-    return {
-      documents,
-      commentsByDocumentId: parsed.commentsByDocumentId ?? {},
-    };
-  } catch {
-    return defaultDb();
-  }
-}
-
-async function writeDb(db: StoredDatabase) {
-  await ensureDbFile();
-  await writeFile(DB_PATH, JSON.stringify(db, null, 2), "utf-8");
-}
-
-export async function listDocumentsDb(): Promise<StoredDocument[]> {
-  const db = await readDb();
-  return [...db.documents].sort((a, b) => b.updatedAt - a.updatedAt);
+  return listDocumentsFile();
 }
 
 export async function getDocumentDb(
   id: string,
+  userId?: string,
 ): Promise<StoredDocument | null> {
-  const db = await readDb();
-  return db.documents.find((doc) => doc.id === id) ?? null;
+  if (isPostgresStore()) {
+    if (!userId) return null;
+    return getDocumentPrisma(id, userId);
+  }
+  return getDocumentFile(id);
 }
 
 export async function createDocumentDb(input?: {
   title?: string;
   content?: string;
+  ownerId?: string;
 }): Promise<StoredDocument> {
-  const db = await readDb();
-  const now = Date.now();
-  const firstPage = createDefaultPage(now);
-  const title = input?.title?.trim() || "Untitled";
-  const content = input?.content || "<p></p>";
-
-  firstPage.title = title;
-  firstPage.content = content;
-
-  const document: StoredDocument = {
-    id: randomUUID(),
-    title,
-    content,
-    pages: [firstPage],
-    activePageId: firstPage.id,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  db.documents.push(document);
-  await writeDb(db);
-  return document;
+  if (isPostgresStore()) {
+    if (!input?.ownerId) {
+      throw new Error("ownerId required for postgres document create");
+    }
+    return createDocumentPrisma(input.ownerId, input);
+  }
+  return createDocumentFile(input);
 }
 
 export async function upsertDocumentDb(
   document: StoredDocument,
+  userId?: string,
 ): Promise<StoredDocument> {
-  const db = await readDb();
-  const normalizedDocument = normalizeDocument(document);
-  const index = db.documents.findIndex(
-    (doc) => doc.id === normalizedDocument.id,
-  );
-
-  if (index === -1) {
-    db.documents.push(normalizedDocument);
-  } else {
-    db.documents[index] = normalizedDocument;
+  if (isPostgresStore()) {
+    if (!userId) {
+      throw new Error("userId required for postgres document upsert");
+    }
+    return upsertDocumentPrisma(userId, document);
   }
-
-  await writeDb(db);
-  return normalizedDocument;
+  return upsertDocumentFile(document);
 }
 
-export async function deleteDocumentDb(id: string): Promise<boolean> {
-  const db = await readDb();
-  const previousLength = db.documents.length;
-  db.documents = db.documents.filter((doc) => doc.id !== id);
-  delete db.commentsByDocumentId[id];
-
-  await writeDb(db);
-  return db.documents.length !== previousLength;
+export async function deleteDocumentDb(
+  id: string,
+  userId?: string,
+): Promise<boolean> {
+  if (isPostgresStore()) {
+    if (!userId) return false;
+    return deleteDocumentPrisma(id, userId);
+  }
+  return deleteDocumentFile(id);
 }
 
 export async function listCommentsDb(
   documentId: string,
+  userId?: string,
 ): Promise<StoredComment[]> {
-  const db = await readDb();
-  return [...(db.commentsByDocumentId[documentId] ?? [])].sort(
-    (a, b) => a.createdAt - b.createdAt,
-  );
+  if (isPostgresStore()) {
+    if (!userId) return [];
+    return listCommentsPrisma(documentId, userId);
+  }
+  return listCommentsFile(documentId);
 }
 
 export async function addCommentDb(
   documentId: string,
   content: string,
   author = "You",
+  userId?: string,
 ): Promise<StoredComment> {
-  const db = await readDb();
-
-  const comment: StoredComment = {
-    id: randomUUID(),
-    documentId,
-    content: content.trim(),
-    author,
-    createdAt: Date.now(),
-  };
-
-  const comments = db.commentsByDocumentId[documentId] ?? [];
-  comments.push(comment);
-  db.commentsByDocumentId[documentId] = comments;
-
-  await writeDb(db);
-  return comment;
+  if (isPostgresStore()) {
+    if (!userId) {
+      throw new Error("userId required for postgres comment create");
+    }
+    return addCommentPrisma(documentId, userId, content, author);
+  }
+  return addCommentFile(documentId, content, author);
 }

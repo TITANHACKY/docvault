@@ -5,6 +5,7 @@ import {
   upsertDocumentDb,
 } from "@/lib/server/document-store";
 import type { StoredDocument, StoredPage } from "@/lib/documents-types";
+import { requireAuth } from "@/lib/server/auth";
 
 function getId(queryId: string | string[] | undefined): string | null {
   return typeof queryId === "string" ? queryId : null;
@@ -14,6 +15,9 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
+  const user = await requireAuth(req, res);
+  if (!user) return;
+
   const id = getId(req.query.id);
 
   if (!id) {
@@ -21,13 +25,16 @@ export default async function handler(
   }
 
   if (req.method === "GET") {
-    const document = await getDocumentDb(id);
+    const document = await getDocumentDb(id, user.id);
     if (!document) return res.status(404).json({ error: "Document not found" });
+    if (document.ownerId && document.ownerId !== user.id) {
+      return res.status(404).json({ error: "Document not found" });
+    }
     return res.status(200).json({ document });
   }
 
   if (req.method === "PUT") {
-    const current = await getDocumentDb(id);
+    const current = await getDocumentDb(id, user.id);
     const now = Date.now();
 
     const payload = req.body as Partial<StoredDocument>;
@@ -79,6 +86,7 @@ export default async function handler(
           : (activePage?.content ?? current?.content ?? "<p></p>"),
       pages,
       activePageId,
+      ownerId: current?.ownerId ?? user.id,
       createdAt:
         typeof payload?.createdAt === "number"
           ? payload.createdAt
@@ -87,12 +95,12 @@ export default async function handler(
         typeof payload?.updatedAt === "number" ? payload.updatedAt : now,
     };
 
-    const document = await upsertDocumentDb(next);
+    const document = await upsertDocumentDb(next, user.id);
     return res.status(200).json({ document });
   }
 
   if (req.method === "DELETE") {
-    const deleted = await deleteDocumentDb(id);
+    const deleted = await deleteDocumentDb(id, user.id);
     if (!deleted) return res.status(404).json({ error: "Document not found" });
     return res.status(200).json({ ok: true });
   }

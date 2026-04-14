@@ -55,6 +55,11 @@ import {
     Unlink,
     Pencil,
     FileText,
+    Rows3,
+    Columns3,
+    Table2 as TableIcon,
+    Trash2,
+    Minus,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SlashMenu from "./SlashMenu";
@@ -112,6 +117,19 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
     /* Drag-handle state */
     const [hoveredBlock, setHoveredBlock] = useState<{ top: number; pos: number } | null>(null);
     const [dropLineY, setDropLineY] = useState<number | null>(null);
+    const [tableUi, setTableUi] = useState<{
+        tablePos: number;
+        tableTop: number;
+        tableLeft: number;
+        tableWidth: number;
+        tableHeight: number;
+        firstRowTop: number;
+        firstRowHeight: number;
+        cellTop: number;
+        cellLeft: number;
+        cellWidth: number;
+        cellHeight: number;
+    } | null>(null);
     const dragSourcePos = useRef<number | null>(null);
     const dropTargetRef = useRef<number | null>(null);
 
@@ -120,6 +138,64 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
     const contentRef = useRef<HTMLDivElement>(null);
     const handleRef = useRef<HTMLDivElement>(null);
     const onOpenLinkedPageRef = useRef(onOpenLinkedPage);
+
+    const updateTableUi = useCallback((editorInstance: CoreEditor) => {
+        if (!editorInstance.isActive('table')) {
+            setTableUi(null);
+            return;
+        }
+
+        const wrapperRect = wrapperRef.current?.getBoundingClientRect();
+        if (!wrapperRect) {
+            setTableUi(null);
+            return;
+        }
+
+        const { from } = editorInstance.state.selection;
+        const domAtPos = editorInstance.view.domAtPos(from);
+        const baseNode = domAtPos.node;
+        const baseElement = baseNode instanceof HTMLElement ? baseNode : baseNode.parentElement;
+        const table = baseElement?.closest('table') as HTMLElement | null;
+
+        if (!table) {
+            setTableUi(null);
+            return;
+        }
+
+        const tableRect = table.getBoundingClientRect();
+        const firstRow = table.querySelector('tr') as HTMLElement | null;
+        const firstRowRect = firstRow?.getBoundingClientRect();
+
+        const { $from } = editorInstance.state.selection;
+        let tablePos: number | null = null;
+
+        for (let depth = $from.depth; depth > 0; depth -= 1) {
+            if ($from.node(depth).type.name === 'table') {
+                tablePos = $from.before(depth);
+                break;
+            }
+        }
+
+        if (tablePos === null) {
+            setTableUi(null);
+            return;
+        }
+
+        setTableUi({
+            tablePos,
+            tableTop: tableRect.top - wrapperRect.top,
+            tableLeft: tableRect.left - wrapperRect.left,
+            tableWidth: tableRect.width,
+            tableHeight: tableRect.height,
+            firstRowTop: firstRowRect ? firstRowRect.top - wrapperRect.top : tableRect.top - wrapperRect.top,
+            firstRowHeight: firstRowRect ? firstRowRect.height : Math.min(tableRect.height, 44),
+            // Use fallback values since we don't need active cell specific measurement for the left control handle
+            cellTop: 0,
+            cellLeft: 0,
+            cellWidth: 0,
+            cellHeight: 0,
+        });
+    }, []);
 
     useEffect(() => {
         onOpenLinkedPageRef.current = onOpenLinkedPage;
@@ -149,9 +225,12 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
             Color,
             Highlight.configure({ multicolor: true }),
             TextAlign.configure({ types: ['heading', 'paragraph'] }),
-            LinkExtension.configure({ openOnClick: true }),
+            LinkExtension.configure({ openOnClick: false }),
             Table.configure({
                 resizable: true,
+                handleWidth: 8,
+                cellMinWidth: 80,
+                lastColumnResizable: true,
             }),
             TableRow,
             TableHeader,
@@ -233,12 +312,14 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
         },
         onUpdate: ({ editor }) => {
             handleSlashDetection(editor);
+            updateTableUi(editor);
             const text = editor.state.doc.textContent;
             const words = text.trim() ? text.trim().split(/\s+/).length : 0;
             onStatsChange?.({ words, characters: text.length });
             onContentChange(editor.getHTML());
         },
         onSelectionUpdate: ({ editor }) => {
+            updateTableUi(editor);
             const { from, to } = editor.state.selection;
             if (from === to) {
                 setTurnIntoOpen(false);
@@ -249,6 +330,22 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
             }
         },
     });
+
+    useEffect(() => {
+        if (!editor) return;
+
+        const onViewportChange = () => {
+            updateTableUi(editor);
+        };
+
+        window.addEventListener('resize', onViewportChange);
+        window.addEventListener('scroll', onViewportChange, true);
+
+        return () => {
+            window.removeEventListener('resize', onViewportChange);
+            window.removeEventListener('scroll', onViewportChange, true);
+        };
+    }, [editor, updateTableUi]);
 
     /* ─── Cmd/Ctrl+K to open link input ────────────────── */
     useEffect(() => {
@@ -312,47 +409,85 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
         const contentEl = contentRef.current;
         if (!contentEl) return;
 
+        const getClosestBlockAtY = (
+            clientX: number,
+            clientY: number,
+        ): { rect: DOMRect; pos: number } | null => {
+            let best: { rect: DOMRect; pos: number } | null = null;
+            let bestDistance = Infinity;
+
+            editor.state.doc.forEach((node, offset) => {
+                const domNode = editor.view.nodeDOM(offset) as HTMLElement | null;
+                if (!domNode) return;
+                const rect = domNode.getBoundingClientRect();
+
+                // For tables, we increase the vertical search distance so top/bottom edges are more responsive
+                const isTable = node.type.name === 'table';
+                const verticalPadding = isTable ? 20 : 0;
+
+                // Check if mouse is within this block's coordinates (including horizontal gutter)
+                if (
+                    clientY >= rect.top - verticalPadding &&
+                    clientY <= rect.bottom + verticalPadding &&
+                    clientX >= rect.left - 150 &&
+                    clientX <= rect.right
+                ) {
+                    best = { rect, pos: offset };
+                    bestDistance = 0;
+                    return false; // break forEach
+                }
+
+                const centerY = (rect.top + rect.bottom) / 2;
+                const distance = Math.abs(clientY - centerY);
+
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    best = { rect, pos: offset };
+                }
+            });
+
+            return best;
+        };
+
         const onMouseMove = (e: MouseEvent) => {
             if (dragSourcePos.current !== null) return;
             // Don't clear hovered block when mouse is over the drag handle buttons
             if (handleRef.current?.contains(e.target as Node)) return;
-            const pos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
-            if (!pos) {
-                setHoveredBlock(null);
-                return;
+
+            const contentRect = contentEl.getBoundingClientRect();
+
+            // Re-calculate table UI positions on mouse move if inside a table to handle scrolling
+            if (editor.isActive('table')) {
+                updateTableUi(editor);
             }
-            try {
-                const resolved = editor.state.doc.resolve(pos.pos);
-                const before = resolved.before(1);
-                const domNode = editor.view.nodeDOM(before) as HTMLElement | null;
-                if (domNode) {
-                    const blockRect = domNode.getBoundingClientRect();
-                    const contentRect = contentEl.getBoundingClientRect();
+
+            // 1. Check if mouse is within the content area horizontally with some gutter padding
+            // We increase the bounds slightly to make hovering near edges feel more responsive
+            const isWithinHorizontalBounds =
+                e.clientX >= contentRect.left - 150 && e.clientX <= contentRect.right + 100;
+            const isWithinVerticalBounds =
+                e.clientY >= contentRect.top - 50 && e.clientY <= contentRect.bottom + 50;
+
+            if (isWithinHorizontalBounds && isWithinVerticalBounds) {
+                const closestBlock = getClosestBlockAtY(e.clientX, e.clientY);
+                if (closestBlock) {
+                    const anchorOffset = Math.min(closestBlock.rect.height / 2, 20);
                     setHoveredBlock({
-                        top: blockRect.top - contentRect.top + 4,
-                        pos: before,
+                        top: closestBlock.rect.top - contentRect.top + anchorOffset,
+                        pos: closestBlock.pos,
                     });
                     return;
                 }
-            } catch {
-                /* pos out of range — ignore */
             }
+
             setHoveredBlock(null);
         };
 
-        const onMouseLeave = (e: MouseEvent) => {
-            // Don't hide if mouse moved to the drag handles
-            if (handleRef.current?.contains(e.relatedTarget as Node)) return;
-            setHoveredBlock(null);
-        };
-
-        contentEl.addEventListener("mousemove", onMouseMove);
-        contentEl.addEventListener("mouseleave", onMouseLeave);
+        document.addEventListener("mousemove", onMouseMove);
         return () => {
-            contentEl.removeEventListener("mousemove", onMouseMove);
-            contentEl.removeEventListener("mouseleave", onMouseLeave);
+            document.removeEventListener("mousemove", onMouseMove);
         };
-    }, [editor]);
+    }, [editor, updateTableUi]);
 
     /* ─── Clear hovered block on keyboard activity ─────── */
     useEffect(() => {
@@ -410,10 +545,10 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
     }, [editor, hoveredBlock]);
 
     /* ─── Drag Handler ────────────────────────────────────── */
-    const handleDragStart = useCallback((e: React.MouseEvent) => {
-        if (!editor || !hoveredBlock) return;
+    const startBlockDrag = useCallback((sourcePos: number, e: React.MouseEvent) => {
+        if (!editor) return;
         e.preventDefault();
-        dragSourcePos.current = hoveredBlock.pos;
+        dragSourcePos.current = sourcePos;
 
         const contentEl = contentRef.current;
         if (!contentEl) return;
@@ -489,12 +624,20 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
             tr.delete(sourcePos, sourcePos + node.nodeSize);
             const mappedTarget = tr.mapping.map(targetPos);
             tr.insert(mappedTarget, node);
+            const anchorPos = Math.max(1, Math.min(mappedTarget + node.nodeSize - 1, tr.doc.content.size));
+            tr.setSelection(TextSelection.near(tr.doc.resolve(anchorPos), -1));
             editor.view.dispatch(tr);
+            editor.commands.focus();
         };
 
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
-    }, [editor, hoveredBlock]);
+    }, [editor]);
+
+    const handleDragStart = useCallback((e: React.MouseEvent) => {
+        if (!hoveredBlock) return;
+        startBlockDrag(hoveredBlock.pos, e);
+    }, [hoveredBlock, startBlockDrag]);
 
     /* ─── Title auto-resize ───────────────────────────────── */
     const resizeTitle = (el: HTMLTextAreaElement) => {
@@ -636,7 +779,7 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
                 ref={(el) => {
                     if (el) resizeTitle(el);
                 }}
-                className={`w-full text-[2.75rem] font-semibold leading-[1.15] tracking-tight bg-transparent resize-none border-none outline-none placeholder:text-[#D4D6DB] mb-1 ${fontClass}`}
+                className={`w-full text-[2.75rem] font-semibold leading-[1.15] tracking-tight bg-transparent resize-none border-none outline-none placeholder:text-[#4b5563] mb-1 ${fontClass}`}
             />
 
             {/* ── Metadata (between title and content) ───── */}
@@ -672,21 +815,21 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
             {/* ── Content area ──────────────────────────────── */}
             <div className={`relative ${fontClass}`} ref={contentRef}>
                 {/* Drag-handle icons */}
-                {hoveredBlock !== null && (
+                {hoveredBlock !== null && (!tableUi || hoveredBlock.pos !== tableUi.tablePos) && (
                     <div
                         ref={handleRef}
                         className="absolute flex items-center gap-0 z-30"
-                        style={{ top: hoveredBlock.top, left: -44 }}
+                        style={{ top: hoveredBlock.top, left: -44, transform: 'translateY(-50%)' }}
                     >
                         <button
-                            className="p-0.5 rounded hover:bg-gray-100 text-gray-300 hover:text-gray-500 transition-colors"
+                            className="p-0.5 rounded hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors"
                             title="Add block"
                             onMouseDown={(e) => { e.preventDefault(); handleAddBlock(); }}
                         >
                             <Plus size={18} />
                         </button>
                         <button
-                            className="p-0.5 rounded hover:bg-gray-100 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing transition-colors"
+                            className="p-0.5 rounded hover:bg-gray-100 text-gray-700 hover:text-gray-900 cursor-grab active:cursor-grabbing transition-colors"
                             title="Drag to move"
                             onMouseDown={handleDragStart}
                         >
@@ -733,7 +876,45 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
                         };
                     }}
                 >
-                    {editor.isActive('link') ? (
+                    {editor.isActive('table') ? (
+                        <div className="bg-white shadow-xl border border-gray-200 rounded-xl px-1.5 py-1 flex items-center gap-1">
+                            {[
+                                { icon: Rows3, title: 'Add row above', action: () => editor.chain().focus().addRowBefore().run() },
+                                { icon: Plus, title: 'Add row below', action: () => editor.chain().focus().addRowAfter().run() },
+                                { icon: Minus, title: 'Delete row', action: () => editor.chain().focus().deleteRow().run() },
+                                { divider: true },
+                                { icon: Columns3, title: 'Add column left', action: () => editor.chain().focus().addColumnBefore().run() },
+                                { icon: Plus, title: 'Add column right', action: () => editor.chain().focus().addColumnAfter().run() },
+                                { icon: Minus, title: 'Delete column', action: () => editor.chain().focus().deleteColumn().run() },
+                                { divider: true },
+                                { icon: TableIcon, title: 'Toggle header row', action: () => editor.chain().focus().toggleHeaderRow().run() },
+                                { icon: FileText, title: 'Toggle header column', action: () => editor.chain().focus().toggleHeaderColumn().run() },
+                                { icon: Trash2, title: 'Delete table', action: () => editor.chain().focus().deleteTable().run(), danger: true },
+                            ].map((item, index) => {
+                                if ('divider' in item) {
+                                    return <div key={`divider-${index}`} className="h-5 w-px bg-gray-200 mx-0.5" />;
+                                }
+
+                                const Icon = item.icon;
+                                return (
+                                    <button
+                                        key={`${item.title}-${index}`}
+                                        onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            item.action();
+                                        }}
+                                        className={`p-1.5 rounded-lg transition-colors ${item.danger
+                                            ? 'text-red-600 hover:bg-red-50'
+                                            : 'text-gray-600 hover:bg-gray-100'
+                                            }`}
+                                        title={item.title}
+                                    >
+                                        <Icon size={16} />
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ) : editor.isActive('link') ? (
                         /* ── Link-specific menu ────────────────────── */
                         <div className="bg-white shadow-xl border border-gray-200 rounded-xl flex items-center px-1.5 py-1 gap-0">
                             {linkEditMode ? (
@@ -1178,11 +1359,50 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
                 </BubbleMenu>
             )}
 
+            {tableUi && hoveredBlock?.pos === tableUi.tablePos && (
+                <>
+                    <div
+                        className="absolute flex items-center gap-0 z-50 pointer-events-none"
+                        style={{
+                            top: tableUi.firstRowTop + tableUi.firstRowHeight / 2,
+                            left: tableUi.tableLeft - 44,
+                            transform: 'translateY(-50%)',
+                        }}
+                    >
+                        <button
+                            className="p-0.5 rounded hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors pointer-events-auto"
+                            title="Add block below table"
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                const tableNode = editor.state.doc.nodeAt(tableUi.tablePos);
+                                if (!tableNode) return;
+                                const insertPos = tableUi.tablePos + tableNode.nodeSize;
+                                editor
+                                    .chain()
+                                    .focus()
+                                    .insertContentAt(insertPos, { type: 'paragraph' })
+                                    .setTextSelection(insertPos + 1)
+                                    .run();
+                            }}
+                        >
+                            <Plus size={18} />
+                        </button>
+                        <button
+                            className="p-0.5 rounded hover:bg-gray-100 text-gray-700 hover:text-gray-900 cursor-grab active:cursor-grabbing transition-colors pointer-events-auto"
+                            title="Drag table"
+                            onMouseDown={(e) => startBlockDrag(tableUi.tablePos, e)}
+                        >
+                            <GripVertical size={18} />
+                        </button>
+                    </div>
+                </>
+            )}
+
             {/* ── Slash Menu ────────────────────────────────── */}
             {buttonBuilderOpen && (
                 <div
                     ref={buttonBuilderRef}
-                    className="absolute z-60 w-[460px] rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl"
+                    className="absolute z-60 w-115 rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl"
                     style={{ top: buttonBuilderPos.top, left: buttonBuilderPos.left }}
                 >
                     <div className="mb-4 inline-flex rounded-lg bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">/Button</div>
@@ -1257,7 +1477,7 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
             {mentionPickerOpen && (
                 <div
                     ref={mentionPickerRef}
-                    className="absolute z-60 w-[620px] rounded-2xl border border-gray-200 bg-white shadow-2xl"
+                    className="absolute z-60 w-155 rounded-2xl border border-gray-200 bg-white shadow-2xl"
                     style={{ top: mentionPickerPos.top, left: mentionPickerPos.left }}
                 >
                     <div className="border-b border-gray-200 px-4 pt-3">
