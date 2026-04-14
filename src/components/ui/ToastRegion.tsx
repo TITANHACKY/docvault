@@ -44,7 +44,7 @@ export default function ToastRegion({ toasts, onDismiss }: ToastRegionProps) {
     if (toasts.length === 0) return null;
 
     return (
-        <div className="pointer-events-none fixed right-4 top-4 z-100 flex w-[min(92vw,22rem)] flex-col gap-2">
+        <div className="pointer-events-none fixed right-4 top-4 z-50 flex w-[min(92vw,22rem)] flex-col gap-2">
             {toasts.map((toast) => {
                 const Icon = toneIcon[toast.tone];
                 return (

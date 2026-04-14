@@ -187,7 +187,7 @@
 }
 
 .ProseMirror .tableWrapper {
-  margin: 0.25rem 0;
+  margin: 0.25rem 0 1.5rem;
   overflow-x: auto;
   padding-right: 6px;
 }
