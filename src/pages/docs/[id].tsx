@@ -48,8 +48,10 @@ interface EditorStats {
   characters: number;
 }
 
-function sanitizePageLinks(html: string): string {
-  return html.replace(/href="\/docs\/[^"]*\?page=([^"]+)"/g, 'href="?page=$1"');
+function sanitizePageLinks(html: string, docId: string): string {
+  return html
+    .replace(/href="\/docs\/[^"]*\?page=([^"]+)"/g, `href="/docs/${docId}/$1"`)
+    .replace(/href="\?page=([^"]+)"/g, `href="/docs/${docId}/$1"`);
 }
 
 function createPage(title = "Untitled"): StoredPage {
@@ -310,7 +312,7 @@ export default function DocEditorPage() {
 
             const sanitizedPages = normalizedPages.map((page) => ({
               ...page,
-              content: sanitizePageLinks(page.content),
+              content: sanitizePageLinks(page.content, docId),
             }));
 
             const validDraft = localDraft ? sanitizeDraft(localDraft) : null;
@@ -326,7 +328,10 @@ export default function DocEditorPage() {
 
             const finalTitle = shouldRestoreDraft ? validDraft.title : existingDocument.title || "Doc";
             const finalPages = shouldRestoreDraft
-              ? validDraft.pages
+              ? validDraft.pages.map((page) => ({
+                ...page,
+                content: sanitizePageLinks(page.content, docId),
+              }))
               : sanitizedPages;
             const finalActivePageId = shouldRestoreDraft
               ? validDraft.activePageId
@@ -409,8 +414,7 @@ export default function DocEditorPage() {
     }
 
     if (!pageFromQuery && activePageId && pages.length > 0) {
-      // If we're on a doc but no page is in the URL, don't let the URL "blank out" our internal state.
-      // Instead, we will let the other useEffect push our activePageId to the URL.
+      // Preserve internal state and let the URL-sync effect normalize the path format.
       return;
     }
 
@@ -428,14 +432,9 @@ export default function DocEditorPage() {
 
     pendingQueryPageRef.current = activePageId;
 
-    void router.replace(
-      {
-        pathname: `/docs/${docId}`,
-        query: { page: activePageId },
-      },
-      undefined,
-      { shallow: true },
-    );
+    void router.replace(`/docs/${docId}/${activePageId}`, undefined, {
+      shallow: true,
+    });
   }, [router.isReady, docId, activePageId, router]);
 
   useEffect(() => {
@@ -673,9 +672,9 @@ export default function DocEditorPage() {
       pages.map((page) => ({
         id: page.id,
         title: page.title || "Untitled",
-        href: `?page=${page.id}`,
+        href: docId ? `/docs/${docId}/${page.id}` : `?page=${page.id}`,
       })),
-    [pages],
+    [pages, docId],
   );
 
   const handlePageTitleChange = useCallback(

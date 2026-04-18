@@ -210,7 +210,10 @@ export default function DocumentsPage() {
             <ul className="divide-y divide-(--editor-border)">
               {documents.map((doc) => (
                 <li key={doc.id} className="group flex items-center justify-between gap-4 px-4 py-4 transition-colors hover:bg-(--editor-surface-muted)">
-                  <Link href={`/docs/${doc.id}`} className="min-w-0 flex-1">
+                  <Link
+                    href={`/docs/${doc.id}/${doc.activePageId}`}
+                    className="min-w-0 flex-1"
+                  >
                     <p className="truncate text-lg font-medium text-(--editor-text)">{doc.title || "Untitled"}</p>
                     <p className="text-sm text-(--editor-text-muted) mt-0.5">Updated {new Date(doc.updatedAt).toLocaleString()}</p>
                   </Link>

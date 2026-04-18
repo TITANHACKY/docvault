@@ -310,7 +310,13 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
 
                 try {
                     const parsed = new URL(href, window.location.origin);
-                    const pageId = parsed.searchParams.get("page");
+                    let pageId = parsed.searchParams.get("page");
+                    if (!pageId) {
+                        const segments = parsed.pathname.split("/").filter(Boolean);
+                        if (segments.length >= 3 && segments[0] === "docs") {
+                            pageId = decodeURIComponent(segments[2]);
+                        }
+                    }
                     if (!pageId) return false;
 
                     event.preventDefault();
@@ -731,7 +737,7 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
                 const selectedPage = filteredMentionPages[selectedMentionIndex];
                 if (!editor || !selectedPage) return;
                 const safeTitle = selectedPage.title || "Untitled";
-                const safeHref = `?page=${selectedPage.id}`;
+                const safeHref = selectedPage.href;
                 editor
                     .chain()
                     .focus()
