@@ -61,7 +61,7 @@ import {
     Trash2,
     Minus,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import SlashMenu from "./SlashMenu";
 import { getFlatItems, type SlashCommandItem } from "@/lib/slash-commands";
 
@@ -83,6 +83,22 @@ interface TiptapEditorProps {
 }
 
 type ButtonAlign = "left" | "center" | "right";
+
+function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function buildPageMentionMarkup(page: { id: string; title: string; href: string }): string {
+    const safeTitle = escapeHtml(page.title || "Untitled");
+    const safeHref = escapeHtml(page.href);
+    const safePageId = escapeHtml(page.id);
+    return `<a href="${safeHref}" class="page-mention" data-page-id="${safePageId}">${safeTitle}</a>`;
+}
 
 /* ─── Component ───────────────────────────────────────────── */
 const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentChange, showOwners = true, showLastModified = true, fontClass = '', onCreatePage, mentionPages = [], onOpenLinkedPage }: TiptapEditorProps) => {
@@ -736,12 +752,16 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
                 event.preventDefault();
                 const selectedPage = filteredMentionPages[selectedMentionIndex];
                 if (!editor || !selectedPage) return;
-                const safeTitle = selectedPage.title || "Untitled";
-                const safeHref = selectedPage.href;
                 editor
                     .chain()
                     .focus()
-                    .insertContent(`<a href="${safeHref}">${safeTitle}</a>`)
+                    .insertContent(
+                        buildPageMentionMarkup({
+                            id: selectedPage.id,
+                            title: selectedPage.title || "Untitled",
+                            href: selectedPage.href,
+                        }),
+                    )
                     .run();
                 setMentionPickerOpen(false);
             }
@@ -798,12 +818,12 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
                 ref={(el) => {
                     if (el) resizeTitle(el);
                 }}
-                className={`w-full text-[2.75rem] font-semibold leading-[1.15] tracking-tight bg-transparent resize-none border-none outline-none placeholder:text-[#4b5563] mb-1 ${fontClass}`}
+                className={`w-full text-[2.75rem] font-semibold leading-[1.15] tracking-tight bg-transparent resize-none border-none outline-none placeholder:text-[#4b5563] mb-5 ${fontClass}`}
             />
 
             {/* ── Metadata (between title and content) ───── */}
             {(showOwners || showLastModified) && (
-                <div className="flex items-center gap-3 text-sm text-gray-400 mb-3" style={{ fontFamily: 'var(--font-system)' }}>
+                <div className="flex items-center gap-3 text-sm text-gray-400 mb-5" style={{ fontFamily: 'var(--font-system)' }}>
                     {showOwners && (
                         <div className="flex items-center gap-2">
                             <div className="relative">
@@ -841,18 +861,18 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
                         style={{ top: hoveredBlock.top, left: -44, transform: 'translateY(-50%)' }}
                     >
                         <button
-                            className="editor-handle-btn p-0.5 rounded hover:bg-gray-100 text-gray-700 hover:text-gray-900 transition-colors"
+                            className="editor-handle-btn p-0.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition-colors"
                             title="Add block"
                             onMouseDown={(e) => { e.preventDefault(); handleAddBlock(); }}
                         >
-                            <Plus size={18} />
+                            <Plus size={15} />
                         </button>
                         <button
-                            className="editor-handle-btn p-0.5 rounded hover:bg-gray-100 text-gray-700 hover:text-gray-900 cursor-grab active:cursor-grabbing transition-colors"
+                            className="editor-handle-btn p-0.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-900 cursor-grab active:cursor-grabbing transition-colors"
                             title="Drag to move"
                             onMouseDown={handleDragStart}
                         >
-                            <GripVertical size={18} />
+                            <GripVertical size={15} />
                         </button>
                     </div>
                 )}
@@ -1565,12 +1585,16 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
                                                 onMouseEnter={() => setSelectedMentionIndex(index)}
                                                 onClick={() => {
                                                     if (!editor) return;
-                                                    const safeTitle = page.title || "Untitled";
-                                                    const safeHref = `?page=${page.id}`;
                                                     editor
                                                         .chain()
                                                         .focus()
-                                                        .insertContent(`<a href="${safeHref}">${safeTitle}</a>`)
+                                                        .insertContent(
+                                                            buildPageMentionMarkup({
+                                                                id: page.id,
+                                                                title: page.title || "Untitled",
+                                                                href: page.href,
+                                                            }),
+                                                        )
                                                         .run();
                                                     setMentionPickerOpen(false);
                                                 }}
@@ -1602,4 +1626,4 @@ const TiptapEditor = ({ onStatsChange, title, onTitleChange, content, onContentC
     );
 };
 
-export default TiptapEditor;
+export default memo(TiptapEditor);

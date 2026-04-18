@@ -163,6 +163,52 @@ body[data-editor-theme] .text-gray-300 {
   color: var(--editor-prose);
 }
 
+.editor-theme .ProseMirror a.page-mention,
+.ProseMirror a.page-mention {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 0.08rem 0.28rem;
+  border-radius: 0.45rem;
+  text-decoration: none;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--editor-text) 88%, #0f172a 12%);
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: inset 0 -1px 0 0 color-mix(in srgb, var(--editor-text-muted) 72%, transparent);
+  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.editor-theme .ProseMirror a.page-mention::after,
+.ProseMirror a.page-mention::after {
+  content: " page";
+  margin-left: 0.04rem;
+  font-size: 0.84em;
+  font-weight: 400;
+  color: color-mix(in srgb, var(--editor-text-muted) 88%, #838c98 12%);
+}
+
+.editor-theme .ProseMirror a.page-mention::before,
+.ProseMirror a.page-mention::before {
+  content: "";
+  width: 0.92rem;
+  height: 0.92rem;
+  border-radius: 0.24rem;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 2h7l5 5v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z' fill='%231a73e8'/%3E%3Cpath d='M14 2v4a2 2 0 0 0 2 2h3z' fill='%2396c3ff'/%3E%3Crect x='8' y='10' width='8' height='1.6' rx='0.8' fill='white' opacity='0.96'/%3E%3Crect x='8' y='13' width='8' height='1.6' rx='0.8' fill='white' opacity='0.9'/%3E%3Crect x='8' y='16' width='6' height='1.6' rx='0.8' fill='white' opacity='0.86'/%3E%3C/svg%3E");
+}
+
+.editor-theme .ProseMirror a.page-mention:hover,
+.ProseMirror a.page-mention:hover {
+  background: color-mix(in srgb, var(--editor-surface-muted) 42%, #cbd5e1 38%);
+  border-color: color-mix(in srgb, var(--editor-border) 46%, #94a3b8 44%);
+  color: var(--editor-text);
+  box-shadow: inset 0 -1px 0 0 color-mix(in srgb, var(--editor-text-muted) 46%, transparent);
+}
+
 .editor-theme-dark {
   color-scheme: dark;
 }

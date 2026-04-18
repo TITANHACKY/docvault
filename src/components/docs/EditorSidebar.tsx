@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { MessageSquare, Type, Sparkles, LayoutGrid, Download, Palette, Moon, Sun } from "lucide-react";
 import EditorSettingsPanel from "@/components/docs/EditorSettingsPanel";
 import type { StoredComment } from "@/lib/documents-types";
@@ -49,7 +50,7 @@ interface EditorSidebarProps {
     disabledPanelIds?: string[];
 }
 
-export default function EditorSidebar(props: EditorSidebarProps) {
+function EditorSidebar(props: EditorSidebarProps) {
     const isPanelOpen = props.activePanel !== null;
     const disabledPanelIds = props.disabledPanelIds ?? [];
     const activeTheme = getEditorTheme(props.theme);
@@ -155,3 +156,24 @@ export default function EditorSidebar(props: EditorSidebarProps) {
         </div>
     );
 }
+
+function sameDisabledPanels(previous?: string[], next?: string[]) {
+    const prev = previous ?? [];
+    const curr = next ?? [];
+    if (prev.length !== curr.length) return false;
+    return prev.every((value, index) => value === curr[index]);
+}
+
+export default memo(EditorSidebar, (prev, next) => {
+    // When the settings panel is open, always rerender to keep controls/live values fresh.
+    if (prev.activePanel !== null || next.activePanel !== null) {
+        return false;
+    }
+
+    // With the panel closed, keep the slim rail stable while typing in the editor.
+    return (
+        prev.activePanel === next.activePanel &&
+        prev.theme === next.theme &&
+        sameDisabledPanels(prev.disabledPanelIds, next.disabledPanelIds)
+    );
+});

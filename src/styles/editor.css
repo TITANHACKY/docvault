@@ -94,7 +94,7 @@
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  color: #6b7280;
+  color: #9a9a9b;
   pointer-events: none;
   height: 0;
 }
@@ -103,10 +103,18 @@
 .ProseMirror .is-empty::before {
   content: attr(data-placeholder);
   float: left;
-  color: #6b7280;
+  color: #9a9a9b;
   pointer-events: none;
   height: 0;
   font-weight: normal;
+}
+
+/* Never render placeholder hints inside table cells. */
+.ProseMirror table td .is-empty::before,
+.ProseMirror table th .is-empty::before,
+.ProseMirror table td p.is-editor-empty::before,
+.ProseMirror table th p.is-editor-empty::before {
+  content: none !important;
 }
 
 /* Task list styles */
@@ -626,6 +634,7 @@
 }
 
 .editor-theme-dark .editor-handle-btn {
+  font-size: small;
   color: var(--editor-text-muted) !important;
 }
 
