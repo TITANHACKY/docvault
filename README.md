@@ -1,96 +1,296 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ✨ Prism
 
-## Getting Started
+A modern, theme-aware rich text editor for collaborative document creation. Write with style—switch between beautiful pre-built themes or craft your own aesthetic in real time.
 
-First, run the development server:
+Prism combines the power of TipTap's advanced editor with a sophisticated theming engine, flexible storage backends, and seamless authentication to give you a document editor that adapts to your workflow.
+
+## 🎨 Features
+
+### Rich Text Editing
+
+- **TipTap-powered editor** with extensive formatting capabilities
+- Support for **tables**, **task lists**, **code blocks** (with syntax highlighting), **links**, and more
+- **Inline formatting** with color, highlights, and text alignment
+- **Bubble menu** for context-aware quick formatting
+- **Slash commands** for rapid content insertion
+
+### Theming System
+
+- **Multiple built-in themes**: Obsidian, Notion Light, Notion Dark, and more
+- **Real-time theme switching** with instant visual updates
+- **Theme-aware UI**: Every element respects your selected theme
+- **Persistent theme preferences** across sessions
+- **Custom CSS variables** for deep theming control
+- **Dynamic scrollbar theming** that matches your editor style
+
+### Advanced Notes
+
+- **Callouts & Highlights** with 8+ color variants (info, warning, success, danger, etc.)
+- **Comments & Annotations** for collaborative feedback
+- **Task tracking** with checkboxes for productive note-taking
+
+### Storage & Sync
+
+- **Flexible backends**: File-based (local development) or PostgreSQL (production)
+- **Guest mode**: Start editing immediately—no account required
+- **Automatic sync**: Guest documents seamlessly migrate to server storage on sign-in
+- **Session management**: Secure authentication with bcrypt-hashed passwords
+
+### Authentication
+
+- **User registration & login** with email
+- **Session-based authentication** via secure cookies
+- **Guest access** for frictionless first-time users
+- **Session tracking** via Prisma ORM
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Node.js** 18+ (or use your preferred Node version manager)
+- **npm** or **yarn**
+- PostgreSQL (optional, for production deployment)
+
+### Development Setup
+
+1. **Clone and install dependencies:**
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <repo-url>
+cd prism
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Storage Backend
-
-The document API supports two backends:
-
-- `file` (default): stores documents/comments in `data/doc-editor-db.json`
-- `postgres`: stores documents/comments in PostgreSQL via Prisma
-
-Set these environment variables in `.env.local` to use PostgreSQL:
+2. **Configure environment (optional for file-based storage):**
 
 ```bash
+# .env.local
+# For PostgreSQL backend (production):
 DOC_STORE_MODE=postgres
-DATABASE_URL=postgres://<user>:<password>@<host>:<port>/<db_name>
-# optional for hosted providers that require SSL
-PGSSL=true
+DATABASE_URL=postgres://user:password@localhost:5432/prism_db
+PGSSL=true  # if required by your provider
 ```
 
-If `DOC_STORE_MODE` is unset (or set to `file`), the app uses file storage.
-
-## Prisma and Authentication
-
-This project includes a Prisma-backed authentication flow with users + sessions.
-
-Required environment variables in `.env.local`:
-
-```bash
-# storage mode options: file | postgres
-DOC_STORE_MODE=postgres
-
-# used by Prisma datasource
-DATABASE_URL=postgres://<user>:<password>@<host>:<port>/<db_name>
-```
-
-Setup commands:
+3. **Set up Prisma (if using PostgreSQL):**
 
 ```bash
 npx prisma generate
 npx prisma migrate dev --name init_auth
 ```
 
-Authentication routes:
+4. **Start development server:**
 
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/logout`
-- `GET /api/auth/me`
+```bash
+npm run dev
+```
 
-UI routes:
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-- `/login` for sign in / sign up
-- `/docs` and `/docs/[id]` are available in guest mode or authenticated mode
+## 📖 Usage
 
-## Guest Mode
+### Modes
 
-If a user is not signed in, the editor works in guest mode:
+**Guest Mode** (No login required)
 
-- documents and comments are stored in browser local storage
-- no account is required to create/edit documents
+- Start editing documents immediately
+- All data stored in browser local storage
+- Perfect for trying Prism out or temporary notes
 
-When the user signs in, guest documents/comments are synced to server storage.
+**Authenticated Mode** (With account)
 
-## Learn More
+- Server-backed document storage
+- Guest documents automatically sync on sign-in
+- Access documents across devices
+- Support for collaborative features
 
-To learn more about Next.js, take a look at the following resources:
+### API Endpoints
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Authentication Routes:**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `POST /api/auth/register` — Create new account
+- `POST /api/auth/login` — Sign in with email/password
+- `POST /api/auth/logout` — Sign out (clears session)
+- `GET /api/auth/me` — Get current user info
 
-## Deploy on Vercel
+**UI Routes:**
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `/login` — Authentication page
+- `/` — Documents dashboard (guest or authenticated)
+- `/docs/[id]` — Editor page for a specific document
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🗄️ Storage Configuration
+
+### File-Based Storage (Development)
+
+Default mode. Documents and comments stored in `data/doc-editor-db.json`.
+
+No configuration needed—just start coding!
+
+### PostgreSQL (Production)
+
+For scalable, multi-user deployments:
+
+```bash
+# .env.local
+DOC_STORE_MODE=postgres
+DATABASE_URL=postgres://user:password@host:5432/db_name
+```
+
+Initialize schema:
+
+```bash
+npx prisma migrate dev --name init_auth
+```
+
+## 🎯 Architecture
+
+- **Frontend**: Next.js 16 (Pages Router) + React 19 + TypeScript
+- **Editor**: TipTap (headless editor framework)
+- **Styling**: Tailwind CSS v4 with dynamic CSS variables
+- **Database**: Prisma ORM + PostgreSQL (or file storage)
+- **Auth**: bcryptjs with secure session cookies
+- **Icons**: Lucide React
+
+### Theming Architecture
+
+Prism uses **HTML-level CSS custom properties** as the single source of truth. When you switch themes:
+
+1. All `--editor-*` CSS variables are updated on `<html>`
+2. Editor, UI, and scrollbars instantly reflect the new palette
+3. Your theme preference is persisted to localStorage
+4. On page reload, your theme is automatically restored
+
+No per-page style conflicts. One theme. Universal consistency.
+
+## 🔧 Development
+
+### Build & Linting
+
+```bash
+npm run build    # Build for production
+npm run lint     # Run ESLint
+npm run dev      # Start dev server with hot reload
+npm start        # Run production server
+```
+
+### Project Structure
+
+```
+src/
+├── app/                  # Placeholder (Pages Router is primary)
+├── pages/                # Next.js pages
+│   ├── _app.tsx         # Global app wrapper & theme hydration
+│   ├── index.tsx        # Dashboard
+│   ├── login.tsx        # Auth page
+│   └── docs/[id].tsx    # Editor page
+├── components/           # React components
+│   ├── docs/
+│   │   ├── Editor.tsx
+│   │   ├── EditorSidebar.tsx
+│   │   └── EditorSettingsPanel.tsx
+│   └── SlashMenu.tsx
+├── lib/                  # Utilities
+│   ├── html-theme.ts    # Theme application engine
+│   ├── slash-commands.ts
+│   └── Callout.ts
+└── styles/               # Global CSS
+```
+
+## 🎨 Theming Guide
+
+### Switch Themes
+
+Use the theme selector in the right sidebar of any document.
+
+### Create Custom Themes
+
+Edit `src/lib/html-theme.ts` to add new theme definitions:
+
+```typescript
+const editorThemes = [
+  {
+    name: "Your Theme",
+    mode: "dark",
+    colors: {
+      bg: "#1a1a1a",
+      surface: "#2d2d2d",
+      text: "#e0e0e0",
+      // ... more colors
+    },
+  },
+];
+```
+
+## 📦 Dependencies
+
+**Core**:
+
+- `next` — React framework
+- `react`, `react-dom` — UI library
+- `typescript` — Type safety
+
+**Editing**:
+
+- `@tiptap/*` — Editor framework & extensions
+- `lowlight` — Syntax highlighting
+
+**Data**:
+
+- `@prisma/client` — ORM
+- `@prisma/adapter-pg` — PostgreSQL adapter
+- `pg` — PostgreSQL driver
+
+**Security & Utils**:
+
+- `bcryptjs` — Password hashing
+- `cookie` — Session management
+- `dotenv` — Environment variables
+
+**Styling**:
+
+- `tailwindcss` — Utility-first CSS
+- `lucide-react` — Icons
+
+## 🚀 Deployment
+
+### Vercel (Recommended)
+
+```bash
+vercel deploy
+```
+
+Ensure environment variables are set in Vercel dashboard:
+
+- `DOC_STORE_MODE=postgres`
+- `DATABASE_URL=<your-postgres-url>`
+
+### Docker / Self-Hosted
+
+```bash
+npm run build
+npm start
+```
+
+Ensure PostgreSQL is accessible via `DATABASE_URL` in `process.env`.
+
+## 🤝 Contributing
+
+We love contributions! Whether it's bug fixes, new themes, or feature ideas:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📝 License
+
+MIT — Feel free to use Prism for personal and commercial projects.
+
+## 🙋 Support
+
+Found a bug or have a feature request? [Open an issue](https://github.com/yourusername/prism/issues).
+
+---
+
+**Happy writing!** ✨ Create, theme, and share documents with Prism.
