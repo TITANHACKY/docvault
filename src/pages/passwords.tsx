@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
     ArrowLeft,
     Check,
@@ -19,6 +19,7 @@ import {
     Trash2,
     WandSparkles,
     X,
+    Upload,
 } from "lucide-react";
 import {
     type VaultBlob, type VaultEntry,
@@ -68,6 +69,46 @@ function blankForm(from?: VaultEntry): EntryFormState {
         password: from?.password ?? "",
         notes: from?.notes ?? "",
     };
+}
+
+function parseCSV(text: string): string[][] {
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let col = "";
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        if (inQuotes) {
+            if (char === '"' && text[i + 1] === '"') {
+                col += '"';
+                i++;
+            } else if (char === '"') {
+                inQuotes = false;
+            } else {
+                col += char;
+            }
+        } else {
+            if (char === '"') {
+                inQuotes = true;
+            } else if (char === ',') {
+                row.push(col);
+                col = "";
+            } else if (char === '\n' || char === '\r') {
+                row.push(col);
+                rows.push(row);
+                row = [];
+                col = "";
+                if (char === '\r' && text[i + 1] === '\n') i++; // Skip \n
+            } else {
+                col += char;
+            }
+        }
+    }
+    if (col || row.length) {
+        row.push(col);
+        rows.push(row);
+    }
+    return rows;
 }
 
 // ── PinPad ──────────────────────────────────────────────────────
@@ -187,6 +228,7 @@ export default function PasswordsPage() {
     const [formShowPw, setFormShowPw] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // ── Initial load ──────────────────────────────────────────────
 
@@ -387,6 +429,58 @@ export default function PasswordsPage() {
     const openAdd = () => { setForm(blankForm()); setFormShowPw(false); setFormError(null); setFormOpen(true); };
     const openEdit = (entry: VaultEntry) => { setForm(blankForm(entry)); setFormShowPw(false); setFormError(null); setFormOpen(true); };
 
+    const importCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !vaultBlob || !vaultKey) return;
+        setIsWorking(true);
+        try {
+            const text = await file.text();
+            const rows = parseCSV(text);
+            if (rows.length < 2) throw new Error("CSV appears to be empty.");
+
+            const headers = rows[0].map((h) => h.trim().toLowerCase());
+            const nm = headers.findIndex((h) => h === "name" || h === "title");
+            const ur = headers.findIndex((h) => h === "url");
+            const us = headers.findIndex((h) => h === "username" || h === "login" || h === "email");
+            const pw = headers.findIndex((h) => h === "password");
+            const nt = headers.findIndex((h) => h === "note" || h === "notes");
+
+            if (pw === -1) throw new Error("Could not find a 'password' column in CSV.");
+
+            const now = Date.now();
+            const newEntries: VaultEntry[] = [];
+
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (row.length < 2) continue; // Skip empty rows
+                const site = nm !== -1 ? row[nm]?.trim() : (ur !== -1 ? row[ur]?.trim() : "Imported Entry");
+                if (!site) continue;
+                newEntries.push({
+                    id: crypto.randomUUID(),
+                    site: site || "Unknown Site",
+                    url: ur !== -1 && row[ur] ? row[ur].trim() : undefined,
+                    username: us !== -1 && row[us] ? row[us].trim() : "",
+                    password: row[pw] || "",
+                    notes: nt !== -1 && row[nt] ? row[nt].trim() : undefined,
+                    createdAt: now,
+                    updatedAt: now,
+                });
+            }
+
+            const next = [...newEntries, ...entries];
+            const newBlob = await updateVaultEntries(vaultBlob, next, vaultKey);
+            await saveVaultBlob(newBlob);
+            setVaultBlob(newBlob); setEntries(next);
+            alert(`Successfully imported ${newEntries.length} passwords!`);
+        } catch (error) {
+            console.error(error);
+            alert(`Import failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+        } finally {
+            setIsWorking(false);
+            if (e.target) e.target.value = "";
+        }
+    };
+
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
         if (!q) return entries;
@@ -556,6 +650,16 @@ export default function PasswordsPage() {
                     </div>
 
                     <div className="ml-auto flex items-center gap-2">
+                        <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={importCsv} />
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isWorking}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-(--editor-border) bg-(--editor-surface) px-3 py-2 text-sm text-(--editor-text-muted) hover:bg-(--editor-surface-muted) transition-colors disabled:opacity-50"
+                            title="Import from Google exported CSV"
+                        >
+                            <Upload size={15} />
+                            <span className="hidden sm:inline">Import</span>
+                        </button>
                         <button
                             onClick={openAdd}
                             className="inline-flex items-center gap-1.5 rounded-lg bg-(--editor-accent) px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
