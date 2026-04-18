@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, FileText, Search, SortAsc, Clock, LogIn, LogOut, BookOpen } from "lucide-react";
+import { Plus, Trash2, FileText, Search, SortAsc, Clock, LogIn, LogOut, BookOpen, Shield } from "lucide-react";
 import {
   createDocument,
   deleteDocument,
@@ -177,6 +177,15 @@ export default function DocumentsPage() {
           <div className="flex items-center gap-2.5">
             <BookOpen size={20} className="text-(--editor-accent)" />
             <span className="text-base font-semibold text-(--editor-text)">Docs</span>
+            <span className="text-(--editor-text-muted) opacity-30 select-none">|</span>
+            <Link
+              href="/passwords"
+              className="flex items-center gap-1.5 text-sm text-(--editor-text-muted) hover:text-(--editor-text) transition-colors"
+              title="Password Vault"
+            >
+              <Shield size={15} />
+              Vault
+            </Link>
           </div>
 
           {/* Search */}
