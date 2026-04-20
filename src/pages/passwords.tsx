@@ -626,7 +626,7 @@ export default function PasswordsPage() {
 
             {/* ── Sticky nav ── */}
             <header className="sticky top-0 z-10 border-b border-(--editor-border) bg-(--editor-bg)/90 backdrop-blur">
-                <div className="mx-auto flex max-w-5xl items-center gap-4 px-6 py-3">
+                <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-2">
                     <div className="flex items-center gap-2.5 shrink-0">
                         <Link href="/" className="flex items-center gap-1.5 text-sm text-(--editor-text-muted) hover:text-(--editor-text) transition-colors">
                             <ArrowLeft size={14} />
@@ -654,7 +654,7 @@ export default function PasswordsPage() {
                         <button
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isWorking}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-(--editor-border) bg-(--editor-surface) px-3 py-2 text-sm text-(--editor-text-muted) hover:bg-(--editor-surface-muted) transition-colors disabled:opacity-50"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-(--editor-border) bg-(--editor-surface) px-2 py-1.5 text-sm text-(--editor-text-muted) hover:bg-(--editor-surface-muted) transition-colors disabled:opacity-50"
                             title="Import from Google exported CSV"
                         >
                             <Upload size={15} />
@@ -680,7 +680,7 @@ export default function PasswordsPage() {
             </header>
 
             {/* ── Content ── */}
-            <div className="mx-auto max-w-5xl px-6 py-8">
+            <div className="mx-auto max-w-5xl px-4 py-4">
 
                 {vaultBlob && !hasPinUnlock(vaultBlob) && (
                     <div className="mb-6 overflow-hidden rounded-2xl border border-amber-500/30 bg-amber-500/5">
@@ -763,11 +763,11 @@ export default function PasswordsPage() {
                             return (
                                 <li
                                     key={entry.id}
-                                    className="group relative flex flex-col gap-3 rounded-2xl border border-(--editor-border) bg-(--editor-surface) p-4 shadow-sm transition-all hover:shadow-md hover:border-(--editor-accent)/30"
+                                    className="group relative flex flex-col gap-2 rounded-xl border border-(--editor-border) bg-(--editor-surface) p-3 shadow-sm transition-all hover:shadow-md hover:border-(--editor-accent)/30"
                                 >
                                     {/* Header row */}
-                                    <div className="flex items-start gap-3">
-                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-(--editor-accent)/10 text-xs font-bold text-(--editor-accent)">
+                                    <div className="flex items-start gap-2">
+                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-(--editor-accent)/10 text-xs font-bold text-(--editor-accent)">
                                             {initials}
                                         </div>
                                         <div className="min-w-0 flex-1">
@@ -802,7 +802,7 @@ export default function PasswordsPage() {
                                     </div>
 
                                     {/* Username row */}
-                                    <div className="flex items-center justify-between gap-2 rounded-lg bg-(--editor-surface-muted) px-3 py-1.5">
+                                    <div className="flex items-center justify-between gap-2 border-b border-(--editor-border)/40 pb-1.5">
                                         <span className="min-w-0 truncate text-xs text-(--editor-text-muted)">{entry.username}</span>
                                         <button
                                             onClick={() => copyText(entry.username, `${entry.id}:user`)}
@@ -816,7 +816,7 @@ export default function PasswordsPage() {
                                     </div>
 
                                     {/* Password row */}
-                                    <div className="flex items-center justify-between gap-2 rounded-lg bg-(--editor-surface-muted) px-3 py-1.5">
+                                    <div className="flex items-center justify-between gap-2 pt-1">
                                         <span className="min-w-0 flex-1 truncate font-mono text-xs text-(--editor-text-muted) select-none">
                                             {pwDisplay}
                                         </span>

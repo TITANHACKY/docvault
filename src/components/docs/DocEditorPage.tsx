@@ -840,8 +840,8 @@ export default function DocEditorPage() {
       />
 
       {isPagesSidebarOpen ? (
-        <aside className="hidden h-screen w-72 shrink-0 overflow-y-auto border-r border-gray-200 bg-gray-50 lg:block">
-          <div className="flex items-center justify-between border-b border-gray-200 px-4 py-4">
+        <aside className="absolute z-40 h-screen w-72 shrink-0 overflow-y-auto border-r border-[var(--editor-border)] bg-[var(--editor-surface)] lg:static lg:block shadow-2xl lg:shadow-none">
+          <div className="flex items-center justify-between border-b border-[var(--editor-border)] px-3 py-2.5">
             <input
               value={documentTitle}
               onChange={(event) => setDocumentTitle(event.target.value)}
@@ -851,15 +851,20 @@ export default function DocEditorPage() {
             />
             <button
               onClick={() => setIsPagesSidebarOpen(false)}
-              className="cursor-pointer rounded-md p-1.5 text-gray-500 hover:bg-gray-100"
-              aria-label="Collapse pages sidebar"
-              title="Collapse pages sidebar"
+              className="lg:hidden cursor-pointer rounded-md p-1.5 text-gray-500 hover:bg-gray-100"
             >
               <ChevronsLeft size={16} />
             </button>
+            <button
+              onClick={handleCreatePage}
+              className="cursor-pointer rounded-md p-1.5 text-[var(--editor-text-muted)] hover:bg-[var(--editor-surface-muted)]"
+              title="New page"
+            >
+              <Plus size={16} />
+            </button>
           </div>
 
-          <div className="p-4">
+          <div className="p-3">
             <p className="mb-2 text-xs uppercase tracking-wide text-gray-400">Pages</p>
             <ul className="space-y-1">
               {pages.map((page) => {
@@ -868,7 +873,7 @@ export default function DocEditorPage() {
                   <li key={page.id} className="group flex items-center gap-1">
                     <button
                       onClick={() => selectPage(page.id)}
-                      className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${isActive ? "bg-gray-200 text-gray-900" : "text-gray-600 hover:bg-gray-100"
+                      className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors ${isActive ? "bg-[var(--editor-surface-muted)] text-[var(--editor-text)]" : "text-[var(--editor-text-muted)] hover:bg-[var(--editor-surface-muted)]"
                         } ${isDarkTheme
                           ? isActive
                             ? "bg-white/14 text-white"
@@ -913,8 +918,8 @@ export default function DocEditorPage() {
         </aside>
       ) : null}
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 bg-(--editor-bg)/80 px-4 py-4 backdrop-blur-sm">
+      <div className="flex flex-1 flex-col min-w-0 relative">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 bg-[var(--editor-bg)]/90 px-3 py-2.5 backdrop-blur-sm border-b border-[var(--editor-border)]">
           <div className="flex min-w-0 items-center gap-2">
             <Link
               href="/"
@@ -970,7 +975,7 @@ export default function DocEditorPage() {
                 onClick={() => {
                   setIsAuthDialogOpen(true);
                 }}
-                className="inline-flex cursor-pointer items-center rounded-xl bg-(--editor-surface) px-4 py-2.5 text-sm font-semibold text-(--editor-text) ring-1 ring-inset ring-(--editor-border) transition-all"
+                className="inline-flex cursor-pointer items-center rounded-xl bg-(--editor-surface) px-3 py-2 text-sm font-semibold text-(--editor-text) ring-1 ring-inset ring-(--editor-border) transition-all"
                 title="Sign in to sync this document"
               >
                 Sign in
@@ -980,7 +985,7 @@ export default function DocEditorPage() {
                 onClick={() => {
                   void handleLogout();
                 }}
-                className="inline-flex cursor-pointer items-center rounded-xl bg-(--editor-surface) px-4 py-2.5 text-sm font-semibold text-(--editor-text) ring-1 ring-inset ring-(--editor-border) transition-all"
+                className="inline-flex cursor-pointer items-center rounded-xl bg-(--editor-surface) px-3 py-2 text-sm font-semibold text-(--editor-text) ring-1 ring-inset ring-(--editor-border) transition-all"
                 title="Sign out"
               >
                 Sign out
@@ -989,8 +994,8 @@ export default function DocEditorPage() {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="flex justify-center px-8 pb-4 pt-8">
+        <div className="flex-1 overflow-y-auto">
+          <div className="flex justify-center px-4 pb-3 pt-5">
             <div className={`w-full ${pageWidth === "full" ? "max-w-none px-8" : "max-w-3xl"}`}>
               <div className={fontSizeClass}>
                 <TiptapEditor
@@ -1011,9 +1016,10 @@ export default function DocEditorPage() {
           </div>
         </div>
 
-        {showStatsOnPage && (
-          <div className="shrink-0 border-t border-gray-100 px-8 py-2 text-xs text-gray-400">{stats.words} words</div>
-        )}
+          <div className="shrink-0 border-t border-[var(--editor-border)] px-4 py-1.5 text-xs text-[var(--editor-text-muted)] opacity-60 flex gap-4">
+            <span>{stats.words} words</span>
+            <span>{stats.characters} chars</span>
+          </div>
       </div>
 
       <EditorSidebar

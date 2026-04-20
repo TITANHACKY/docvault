@@ -1,0 +1,43 @@
+name: Deploy to aaPanel
+
+on:
+  push:
+    branches:
+      - main # Triggers the deployment when pushing to the main branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          # You can use a password or an SSH key (recommended)
+          password: ${{ secrets.SERVER_PASSWORD }} 
+          # key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            # 1. Navigate to your project directory on aaPanel
+            # Replace 'your-domain.com' with the actual path in your aaPanel
+            cd /www/wwwroot/your-domain.com
+            
+            # 2. Pull the latest code
+            git pull origin main
+            
+            # 3. Build the Docker image
+            docker build -t doc-editor:latest .
+            
+            # 4. Stop and remove the existing container (ignore errors if it doesn't exist)
+            docker stop doc-editor || true
+            docker rm doc-editor || true
+            
+            # 5. Run the new container, mapping port 3003 to 3003
+            docker run -d --name doc-editor -p 3003:3003 \
+              --env-file .env \
+              --restart unless-stopped \
+              doc-editor:latest
+            
+            # 6. Database Migration (optional but recommended)
+            docker exec doc-editor npx prisma db push
