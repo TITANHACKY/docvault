@@ -3,7 +3,7 @@ name: Deploy to aaPanel
 on:
   push:
     branches:
-      - master # Triggers the deployment when pushing to the main branch
+      - master # Triggers the deployment when pushing to the master branch
 
 jobs:
   deploy:
@@ -14,30 +14,17 @@ jobs:
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
-          # You can use a password or an SSH key (recommended)
-          password: ${{ secrets.SERVER_PASSWORD }} 
-          # key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_PORT || 22 }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
           script: |
             # 1. Navigate to your project directory on aaPanel
-            # Replace 'your-domain.com' with the actual path in your aaPanel
-            cd /www/wwwroot/your-domain.com
+            cd ${{ secrets.SERVER_PATH }}
             
             # 2. Pull the latest code
-            git pull origin main
+            git pull origin master
             
-            # 3. Build the Docker image
-            docker build -t doc-editor:latest .
+            # 3. Build and Start the Docker Compose stack in detached mode
+            docker-compose up -d --build
             
-            # 4. Stop and remove the existing container (ignore errors if it doesn't exist)
-            docker stop doc-editor || true
-            docker rm doc-editor || true
-            
-            # 5. Run the new container, mapping port 3003 to 3003
-            docker run -d --name doc-editor -p 3003:3003 \
-              --env-file .env \
-              --restart unless-stopped \
-              doc-editor:latest
-            
-            # 6. Database Migration (optional but recommended)
-            docker exec doc-editor npx prisma db push
+            # 4. Database Migration (optional but recommended)
+            docker-compose exec -T app npx prisma db push

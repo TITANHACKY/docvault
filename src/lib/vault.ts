@@ -64,13 +64,13 @@ function rand(n: number): Uint8Array {
 async function derivePinKey(pin: string, salt: Uint8Array): Promise<CryptoKey> {
   const baseKey = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(pin),
+    new TextEncoder().encode(pin) as unknown as BufferSource,
     "PBKDF2",
     false,
     ["deriveKey"],
   );
   return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
+    { name: "PBKDF2", salt: salt as unknown as BufferSource, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
     baseKey,
     { name: "AES-GCM", length: 256 },
     false,
@@ -85,8 +85,8 @@ async function derivePrfKey(prfOutput: ArrayBuffer): Promise<CryptoKey> {
   return crypto.subtle.deriveKey(
     {
       name: "HKDF",
-      salt: new Uint8Array(32),
-      info: new TextEncoder().encode(`${APP_NAME}-biometric-wrap`),
+      salt: new Uint8Array(32) as unknown as BufferSource,
+      info: new TextEncoder().encode(`${APP_NAME}-biometric-wrap`) as unknown as BufferSource,
       hash: "SHA-256",
     },
     base,
@@ -102,9 +102,9 @@ async function wrapVaultKey(
 ): Promise<WrappedKey> {
   const iv = rand(12);
   const wrapped = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
+    { name: "AES-GCM", iv: iv as unknown as BufferSource },
     wrapKey,
-    vaultKeyRaw,
+    vaultKeyRaw as unknown as BufferSource,
   );
   return { iv: b64(iv), wrappedKey: b64(wrapped) };
 }
@@ -115,9 +115,9 @@ async function unwrapVaultKey(
 ): Promise<Uint8Array | null> {
   try {
     const plain = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: fromb64(w.iv) },
+      { name: "AES-GCM", iv: fromb64(w.iv) as unknown as BufferSource },
       wrapKey,
-      fromb64(w.wrappedKey),
+      fromb64(w.wrappedKey) as unknown as BufferSource,
     );
     return new Uint8Array(plain);
   } catch {
@@ -131,7 +131,7 @@ async function encryptData(
 ): Promise<{ ciphertext: string; iv: string }> {
   const key = await crypto.subtle.importKey(
     "raw",
-    keyRaw,
+    keyRaw as unknown as BufferSource,
     { name: "AES-GCM" },
     false,
     ["encrypt"],
@@ -139,9 +139,9 @@ async function encryptData(
   const iv = rand(12);
   const encoded = new TextEncoder().encode(JSON.stringify(data));
   const cipher = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
+    { name: "AES-GCM", iv: iv as unknown as BufferSource },
     key,
-    encoded,
+    encoded as unknown as BufferSource,
   );
   return { ciphertext: b64(cipher), iv: b64(iv) };
 }
@@ -154,15 +154,15 @@ async function decryptData(
   try {
     const key = await crypto.subtle.importKey(
       "raw",
-      keyRaw,
+      keyRaw as unknown as BufferSource,
       { name: "AES-GCM" },
       false,
       ["decrypt"],
     );
     const plain = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: fromb64(iv) },
+      { name: "AES-GCM", iv: fromb64(iv) as unknown as BufferSource },
       key,
-      fromb64(ciphertext),
+      fromb64(ciphertext) as unknown as BufferSource,
     );
     return JSON.parse(new TextDecoder().decode(plain)) as VaultEntry[];
   } catch {
@@ -285,9 +285,9 @@ export async function registerBiometric(): Promise<BiometricRegistration | null>
   try {
     credential = (await navigator.credentials.create({
       publicKey: {
-        challenge,
+        challenge: challenge as unknown as BufferSource,
         rp: { name: "Doc Vault", id: window.location.hostname },
-        user: { id: userId, name: APP_NAME, displayName: "Vault" },
+        user: { id: userId as unknown as BufferSource, name: APP_NAME, displayName: "Vault" },
         pubKeyCredParams: [
           { alg: -7, type: "public-key" },
           { alg: -257, type: "public-key" },
@@ -325,8 +325,8 @@ async function getPrfOutput(
   try {
     assertion = (await navigator.credentials.get({
       publicKey: {
-        challenge,
-        allowCredentials: [{ id: fromb64(credentialId), type: "public-key" }],
+        challenge: challenge as unknown as BufferSource,
+        allowCredentials: [{ id: fromb64(credentialId) as unknown as BufferSource, type: "public-key" }],
         userVerification: "required",
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         extensions: { prf: { eval: { first: fromb64(prfSalt) } } } as any,
