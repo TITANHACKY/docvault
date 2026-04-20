@@ -23,7 +23,7 @@ export default function DocRedirectPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const theme = loadGlobalEditorTheme() ?? "notesnook-light";
+    const theme = loadGlobalEditorTheme() ?? "docvault-light";
     applyEditorThemeToHtml(theme);
   }, []);
 

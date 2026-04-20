@@ -16,8 +16,8 @@ import { applyEditorThemeToHtml } from "@/lib/html-theme";
 export default function LoginPage() {
     const router = useRouter();
     const [theme] = useState<EditorTheme>(() => {
-        if (typeof window === "undefined") return "notesnook-light";
-        return loadGlobalEditorTheme() ?? "notesnook-light";
+        if (typeof window === "undefined") return "docvault-light";
+        return loadGlobalEditorTheme() ?? "docvault-light";
     });
     const [mode, setMode] = useState<"login" | "register">("login");
     const [name, setName] = useState("");

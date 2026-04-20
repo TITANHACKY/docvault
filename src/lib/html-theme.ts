@@ -59,6 +59,6 @@ export function applyEditorThemeToHtml(theme: EditorTheme) {
 }
 
 export function hydrateEditorThemeFromStorage() {
-  const theme = loadGlobalEditorTheme() ?? "notesnook-light";
+  const theme = loadGlobalEditorTheme() ?? "docvault-light";
   setRootThemeVars(theme);
 }

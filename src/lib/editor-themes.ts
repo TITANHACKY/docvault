@@ -20,7 +20,7 @@ export interface EditorThemeDefinition {
 
 export const editorThemes = [
   {
-    key: "notesnook-dark",
+    key: "docvault-dark",
     label: "Classic Dark",
     mode: "dark",
     accent: "#8b5cf6",
@@ -35,7 +35,7 @@ export const editorThemes = [
     },
   },
   {
-    key: "notesnook-light",
+    key: "docvault-light",
     label: "Classic Light",
     mode: "light",
     accent: "#8b5cf6",
@@ -230,7 +230,7 @@ export const editorThemes = [
     },
   },
   {
-    key: "notesnook-blue",
+    key: "docvault-blue",
     label: "Classic Blue",
     mode: "light",
     accent: "#2563eb",
@@ -287,7 +287,7 @@ export function isEditorTheme(value: string): value is EditorTheme {
 export function getEditorTheme(theme: EditorTheme): EditorThemeDefinition {
   return (
     editorThemes.find((item) => item.key === theme) ??
-    editorThemes.find((item) => item.key === "notesnook-light") ??
+    editorThemes.find((item) => item.key === "docvault-light") ??
     editorThemes[0]
   );
 }

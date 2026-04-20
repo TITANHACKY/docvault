@@ -181,8 +181,8 @@ type SetupStep = "pin" | "confirm" | "biometric-prompt" | "biometric-reg";
 
 export default function PasswordsPage() {
     const [theme] = useState<EditorTheme>(() => {
-        if (typeof window === "undefined") return "notesnook-light";
-        return loadGlobalEditorTheme() ?? "notesnook-light";
+        if (typeof window === "undefined") return "docvault-light";
+        return loadGlobalEditorTheme() ?? "docvault-light";
     });
 
     const themeDefinition = useMemo(() => getEditorTheme(theme), [theme]);
@@ -206,7 +206,7 @@ export default function PasswordsPage() {
     const [confirmPin, setConfirmPin] = useState("");
     const [pinError, setPinError] = useState<string | null>(null);
     const [isWorking, setIsWorking] = useState(false);
-    
+
     // ── Retrofit existing vault PIN ──────────────────────────────
     const [retroPin, setRetroPin] = useState("");
     const [retroConfirmPin, setRetroConfirmPin] = useState("");
@@ -281,7 +281,7 @@ export default function PasswordsPage() {
             } catch (error) {
                 console.error("Biometric setup failed, falling back to PIN", error);
             }
-            
+
             await saveVaultBlob(finalBlob);
             setVaultBlob(finalBlob); setVaultKey(key); setEntries([]);
             setScreen("unlocked");
@@ -707,7 +707,7 @@ export default function PasswordsPage() {
                                 <h3 className="font-semibold text-(--editor-text)">
                                     {retroPin.length < PIN_LENGTH ? "Enter a new 4-digit PIN" : "Confirm your 4-digit PIN"}
                                 </h3>
-                                <div className="mt-2 text-(--editor-text)"> 
+                                <div className="mt-2 text-(--editor-text)">
                                     <PinPad
                                         value={retroPin.length < PIN_LENGTH ? retroPin : retroConfirmPin}
                                         onChange={retroPin.length < PIN_LENGTH ? setRetroPin : setRetroConfirmPin}

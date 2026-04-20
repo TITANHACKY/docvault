@@ -176,8 +176,8 @@ export default function DocEditorPage() {
 
   const [fontStyle, setFontStyle] = useState("font-system");
   const [theme, setTheme] = useState<EditorTheme>(() => {
-    if (typeof window === "undefined") return "notesnook-light";
-    return loadGlobalEditorTheme() ?? "notesnook-light";
+    if (typeof window === "undefined") return "docvault-light";
+    return loadGlobalEditorTheme() ?? "docvault-light";
   });
   const [fontSize, setFontSize] = useState<"small" | "default" | "large">("default");
   const [pageWidth, setPageWidth] = useState<"default" | "full">("default");
@@ -1016,10 +1016,10 @@ export default function DocEditorPage() {
           </div>
         </div>
 
-          <div className="shrink-0 border-t border-[var(--editor-border)] px-4 py-1.5 text-xs text-[var(--editor-text-muted)] opacity-60 flex gap-4">
-            <span>{stats.words} words</span>
-            <span>{stats.characters} chars</span>
-          </div>
+        <div className="shrink-0 border-t border-[var(--editor-border)] px-4 py-1.5 text-xs text-[var(--editor-text-muted)] opacity-60 flex gap-4">
+          <span>{stats.words} words</span>
+          <span>{stats.characters} chars</span>
+        </div>
       </div>
 
       <EditorSidebar

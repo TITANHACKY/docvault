@@ -48,8 +48,8 @@ export default function DocumentsPage() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"date" | "name">("date");
   const [theme] = useState<EditorTheme>(() => {
-    if (typeof window === "undefined") return "notesnook-light";
-    return loadGlobalEditorTheme() ?? "notesnook-light";
+    if (typeof window === "undefined") return "docvault-light";
+    return loadGlobalEditorTheme() ?? "docvault-light";
   });
 
   const themeDefinition = useMemo(() => getEditorTheme(theme), [theme]);
