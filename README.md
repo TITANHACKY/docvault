@@ -1,8 +1,8 @@
-# ✨ Prism
+# ✨ DocVault
 
-A modern, theme-aware rich text editor for collaborative document creation. Write with style—switch between beautiful pre-built themes or craft your own aesthetic in real time.
+A secure, all-in-one workspace featuring a theme-aware rich text editor combined with a seamlessly integrated AES-256 encrypted password manager. 
 
-Prism combines the power of TipTap's advanced editor with a sophisticated theming engine, flexible storage backends, and seamless authentication to give you a document editor that adapts to your workflow.
+DocVault combines the power of TipTap's advanced editor, a sophisticated theming engine, and secure local cryptography to give you a fully private vault that adapts to your workflow.
 
 ## 🎨 Features
 
@@ -28,6 +28,13 @@ Prism combines the power of TipTap's advanced editor with a sophisticated themin
 - **Callouts & Highlights** with 8+ color variants (info, warning, success, danger, etc.)
 - **Comments & Annotations** for collaborative feedback
 - **Task tracking** with checkboxes for productive note-taking
+
+### Secure Password Vault 🔒
+
+- **AES-GCM Encryption**: Passwords are mathematically secured on your browser before ever touching the database.
+- **Biometric Unlock**: Securely access your vault using MacOS TouchID, Windows Hello, or mobile biometrics (powered by WebAuthn PRF).
+- **4-Digit PIN Fallback**: Mandatory, high-security 4-digit PIN system wrapping encryption keys.
+- **Google CSV Import**: Instant, bulk importation of existing Google passwords.
 
 ### Storage & Sync
 
@@ -56,8 +63,8 @@ Prism combines the power of TipTap's advanced editor with a sophisticated themin
 1. **Clone and install dependencies:**
 
 ```bash
-git clone <repo-url>
-cd prism
+git clone https://github.com/TITANHACKY/docvault.git
+cd docvault
 npm install
 ```
 
@@ -94,7 +101,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 - Start editing documents immediately
 - All data stored in browser local storage
-- Perfect for trying Prism out or temporary notes
+- Perfect for trying DocVault out or temporary notes
 
 **Authenticated Mode** (With account)
 
@@ -153,7 +160,7 @@ npx prisma migrate dev --name init_auth
 
 ### Theming Architecture
 
-Prism uses **HTML-level CSS custom properties** as the single source of truth. When you switch themes:
+DocVault uses **HTML-level CSS custom properties** as the single source of truth. When you switch themes:
 
 1. All `--editor-*` CSS variables are updated on `<html>`
 2. Editor, UI, and scrollbars instantly reflect the new palette
@@ -264,14 +271,18 @@ Ensure environment variables are set in Vercel dashboard:
 - `DOC_STORE_MODE=postgres`
 - `DATABASE_URL=<your-postgres-url>`
 
-### Docker / Self-Hosted
+### Docker & aaPanel (CI/CD GitHub Actions)
 
+We've configured `output: "standalone"` in the Next.js setup alongside a robust, lightweight `Dockerfile` for easy 1-click deployments to your own server or directly to your aaPanel.
+
+**Option A (Manual)**:
 ```bash
-npm run build
-npm start
+docker pull doc-vault:latest
+docker run -d --name doc-vault -p 3003:3003 doc-vault:latest
 ```
 
-Ensure PostgreSQL is accessible via `DATABASE_URL` in `process.env`.
+**Option B (aaPanel via GitHub Actions)**:
+Inside the `.github/workflows/deploy.yml`, you will find an automatic continuous deployment script. Just add your `SERVER_HOST`, `SERVER_USER`, `SERVER_PASSWORD` to your GitHub secrets, ensure your `docker` service is running on the host, and watch your changes auto-deploy to port `3003` on aaPanel upon pushing to `main`!
 
 ## 🤝 Contributing
 
@@ -285,12 +296,12 @@ We love contributions! Whether it's bug fixes, new themes, or feature ideas:
 
 ## 📝 License
 
-MIT — Feel free to use Prism for personal and commercial projects.
+MIT — Feel free to use DocVault for personal and commercial projects.
 
 ## 🙋 Support
 
-Found a bug or have a feature request? [Open an issue](https://github.com/yourusername/prism/issues).
+Found a bug or have a feature request? [Open an issue](https://github.com/TITANHACKY/docvault/issues).
 
 ---
 
-**Happy writing!** ✨ Create, theme, and share documents with Prism.
+**Happy writing!** ✨ Create, theme, and securely store with DocVault.
