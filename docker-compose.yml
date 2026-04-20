@@ -11,26 +11,8 @@ services:
       - "3003:3003"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgres://docvault:your_password@db:5432/docvault
-    depends_on:
-      - db
+      - DATABASE_URL=${DATABASE_URL}
     restart: unless-stopped
     # If using local .env file instead of declaring here:
     env_file:
       - .env
-
-  db:
-    image: postgres:15-alpine
-    container_name: docvault-db
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: docvault
-      POSTGRES_PASSWORD: your_password_here
-      POSTGRES_DB: docvault
-    ports:
-      - "5432:5432"
-    volumes:
-      - docvault-pgdata:/var/lib/postgresql/data
-
-volumes:
-  docvault-pgdata:
