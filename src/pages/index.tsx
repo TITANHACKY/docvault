@@ -12,6 +12,7 @@ import {
 } from "@/lib/documents";
 import ToastRegion, { type ToastMessage } from "@/components/ui/ToastRegion";
 import LoadingScreen from "@/components/ui/LoadingScreen";
+import BrandLogo from "@/components/ui/BrandLogo";
 import { getCurrentUser, logoutUser, type AuthUser } from "@/lib/auth-client";
 import AuthDialog from "@/components/auth/AuthDialog";
 import {
@@ -182,7 +183,7 @@ export default function DocumentsPage() {
       <header className="sticky top-0 z-10 border-b border-(--editor-border) bg-(--editor-bg)/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
           <div className="flex items-center gap-2.5">
-            <BookOpen size={20} className="text-(--editor-accent)" />
+            <BrandLogo className="h-6 w-6" />
             <span className="text-base font-semibold text-(--editor-text)">Docs</span>
             <span className="text-(--editor-text-muted) opacity-30 select-none">|</span>
             <Link

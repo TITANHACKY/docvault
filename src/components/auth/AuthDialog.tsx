@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Eye, EyeOff, KeyRound, WandSparkles, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, KeyRound, WandSparkles, AlertCircle, X } from "lucide-react";
 import { loginUser, registerUser } from "@/lib/auth-client";
 import { syncGuestDataToServer } from "@/lib/guest-sync";
+import BrandLogo from "../ui/BrandLogo";
 
 interface AuthDialogProps {
     open: boolean;
@@ -81,19 +82,28 @@ export default function AuthDialog({ open, onClose, onSuccess }: AuthDialogProps
 
     return (
         <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4" role="dialog" aria-modal="true">
-            <div className="w-full max-w-md rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xl">
-                <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                        {mode === "login" ? "Welcome back" : mode === "register" ? "Create your account" : "Reset password"}
-                    </h2>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
-                        title="Close sign in dialog"
-                    >
-                        Close
-                    </button>
+            <div className="relative w-full max-w-md rounded-2xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xl">
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="absolute right-4 top-4 rounded-lg p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                    title="Close"
+                >
+                    <X size={20} />
+                </button>
+
+                <div className="mb-6 flex flex-col items-center gap-3 text-center">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-950/30 ring-1 ring-indigo-100 dark:ring-indigo-900/30">
+                        <BrandLogo className="h-10 w-10" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">
+                            {mode === "login" ? "Welcome back" : mode === "register" ? "Create your account" : "Reset password"}
+                        </h2>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            {mode === "login" ? "Securely access your encrypted docs" : mode === "register" ? "Join DocVault for end-to-end security" : "Enter your email to receive a recovery link"}
+                        </p>
+                    </div>
                 </div>
 
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">

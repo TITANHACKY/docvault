@@ -39,6 +39,7 @@ import {
 } from "@/lib/editor-themes";
 import { applyEditorThemeToHtml } from "@/lib/html-theme";
 import LoadingScreen from "@/components/ui/LoadingScreen";
+import BrandLogo from "@/components/ui/BrandLogo";
 import { AlertCircle } from "lucide-react";
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -629,7 +630,7 @@ export default function PasswordsPage() {
                         </Link>
                         <span className="text-(--editor-text-muted) opacity-30">/</span>
                         <div className="flex items-center gap-1.5">
-                            <Shield size={15} className="text-(--editor-accent)" />
+                            <BrandLogo className="h-4 w-4" />
                             <span className="text-sm font-semibold text-(--editor-text)">Vault</span>
                         </div>
                     </div>
