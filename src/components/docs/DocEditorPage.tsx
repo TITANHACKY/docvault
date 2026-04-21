@@ -33,6 +33,7 @@ import {
   loadEditorPreferences,
   saveEditorPreferences,
 } from "@/lib/editor-preferences";
+import LoadingScreen from "@/components/ui/LoadingScreen";
 import AuthDialog from "@/components/auth/AuthDialog";
 import {
   getEditorTheme,
@@ -819,9 +820,10 @@ export default function DocEditorPage() {
 
   if (!activePage) {
     return (
-      <main className={`editor-theme ${themeModeClass} flex min-h-screen items-center justify-center bg-white text-gray-500`}>
-        {authChecked ? "Loading document..." : "Checking session..."}
-      </main>
+      <LoadingScreen 
+        message={authChecked ? "Entering Vault" : "DocVault"} 
+        label={authChecked ? "Opening document" : "Checking session"} 
+      />
     );
   }
 

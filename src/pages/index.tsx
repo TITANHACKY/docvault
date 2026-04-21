@@ -11,6 +11,7 @@ import {
   type StoredDocument,
 } from "@/lib/documents";
 import ToastRegion, { type ToastMessage } from "@/components/ui/ToastRegion";
+import LoadingScreen from "@/components/ui/LoadingScreen";
 import { getCurrentUser, logoutUser, type AuthUser } from "@/lib/auth-client";
 import AuthDialog from "@/components/auth/AuthDialog";
 import {
@@ -45,6 +46,7 @@ export default function DocumentsPage() {
   const [isGuestMode, setIsGuestMode] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
+  const [isLoadingDocs, setIsLoadingDocs] = useState(true);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"date" | "name">("date");
   const [theme] = useState<EditorTheme>(() => {
@@ -70,31 +72,38 @@ export default function DocumentsPage() {
     setToasts((previous) => previous.filter((toast) => toast.id !== id));
   }, []);
 
-  const reload = useCallback(async () => {
-    const nextDocuments = isGuestMode
-      ? await listGuestDocuments()
-      : await listDocuments();
-    setDocuments(nextDocuments);
+  const reload = useCallback(async (guestModeOverride?: boolean) => {
+    setIsLoadingDocs(true);
+    try {
+      const activeGuestMode = guestModeOverride ?? isGuestMode;
+      const nextDocuments = activeGuestMode
+        ? await listGuestDocuments()
+        : await listDocuments();
+      setDocuments(nextDocuments);
+    } finally {
+      setIsLoadingDocs(false);
+    }
   }, [isGuestMode]);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      void (async () => {
-        const currentUser = await getCurrentUser().catch(() => null);
-        setUser(currentUser);
-        const nextIsGuestMode = !currentUser;
-        setIsGuestMode(nextIsGuestMode);
-        setAuthChecked(true);
+    void (async () => {
+      const currentUser = await getCurrentUser().catch(() => null);
+      setUser(currentUser);
+      const nextIsGuestMode = !currentUser;
+      setIsGuestMode(nextIsGuestMode);
+      setAuthChecked(true);
 
+      setIsLoadingDocs(true);
+      try {
         const nextDocuments = nextIsGuestMode
           ? await listGuestDocuments()
           : await listDocuments();
         setDocuments(nextDocuments);
-      })();
-    }, 0);
-
-    return () => clearTimeout(timeout);
-  }, [router]);
+      } finally {
+        setIsLoadingDocs(false);
+      }
+    })();
+  }, [router.asPath]);
 
   const handleLogout = async () => {
     await logoutUser();
@@ -149,11 +158,7 @@ export default function DocumentsPage() {
   };
 
   if (!authChecked) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-gray-50 text-sm text-gray-500">
-        Checking session…
-      </main>
-    );
+    return <LoadingScreen />;
   }
 
   return (
@@ -165,8 +170,10 @@ export default function DocumentsPage() {
         onSuccess={async () => {
           const currentUser = await getCurrentUser().catch(() => null);
           setUser(currentUser);
-          setIsGuestMode(!currentUser);
-          await reload();
+          const nextIsGuestMode = !currentUser;
+          setIsGuestMode(nextIsGuestMode);
+          // Pass the new mode directly to reload because state updates are async!
+          await reload(nextIsGuestMode);
           pushToast("success", "Signed in and synced");
         }}
       />
@@ -256,8 +263,14 @@ export default function DocumentsPage() {
           </span>
         </div>
 
-        {/* Empty state */}
-        {emptyState ? (
+        {/* Loading state / Empty state */}
+        {isLoadingDocs ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="h-32 w-full animate-pulse rounded-2xl border border-(--editor-border) bg-(--editor-surface)/50" />
+            ))}
+          </div>
+        ) : emptyState ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-(--editor-border) bg-(--editor-surface)/40 px-8 py-20 text-center">
             <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-(--editor-surface) shadow-sm ring-1 ring-(--editor-border)">
               <FileText size={26} className="text-(--editor-accent)" />

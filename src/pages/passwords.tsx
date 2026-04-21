@@ -38,6 +38,8 @@ import {
     type EditorTheme,
 } from "@/lib/editor-themes";
 import { applyEditorThemeToHtml } from "@/lib/html-theme";
+import LoadingScreen from "@/components/ui/LoadingScreen";
+import { AlertCircle } from "lucide-react";
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -121,14 +123,14 @@ function PinPad({
 }: {
     value: string;
     onChange: (v: string) => void;
-    onComplete?: () => void;
+    onComplete?: (v: string) => void;
     disabled?: boolean;
 }) {
     const handleDigit = (d: string) => {
         if (disabled || value.length >= PIN_LENGTH) return;
         const next = value + d;
         onChange(next);
-        if (next.length === PIN_LENGTH) onComplete?.();
+        if (next.length === PIN_LENGTH) onComplete?.(next);
     };
     const handleBackspace = () => { if (!disabled) onChange(value.slice(0, -1)); };
 
@@ -140,7 +142,7 @@ function PinPad({
                 if (value.length >= PIN_LENGTH) return;
                 const next = value + e.key;
                 onChange(next);
-                if (next.length === PIN_LENGTH) onComplete?.();
+                if (next.length === PIN_LENGTH) onComplete?.(next);
             } else if (e.key === "Backspace") {
                 onChange(value.slice(0, -1));
             }
@@ -255,9 +257,9 @@ export default function PasswordsPage() {
         } finally { setIsWorking(false); }
     };
 
-    const handleSetupConfirmComplete = async () => {
-        if (confirmPin.length < PIN_LENGTH) return;
-        if (pin !== confirmPin) { setPinError("PINs don't match. Try again."); setConfirmPin(""); return; }
+    const handleSetupConfirmComplete = async (confirmVal: string) => {
+        if (confirmVal.length < PIN_LENGTH) return;
+        if (pin !== confirmVal) { setPinError("PINs don't match. Try again."); setConfirmPin(""); return; }
         setPinError(null);
         if (bioAvailable) {
             setSetupStep("biometric-prompt");
@@ -290,11 +292,11 @@ export default function PasswordsPage() {
 
     // ── Unlock handlers ────────────────────────────────────────────
 
-    const handleUnlockPin = async () => {
-        if (!vaultBlob || pin.length < PIN_LENGTH) return;
+    const handleUnlockPin = async (val: string) => {
+        if (!vaultBlob || val.length < PIN_LENGTH) return;
         setPinError(null); setIsWorking(true);
         try {
-            const result = await unlockWithPin(vaultBlob, pin);
+            const result = await unlockWithPin(vaultBlob, val);
             if (!result) { setPinError("Incorrect PIN. Please try again."); setPin(""); return; }
             setEntries(result.entries); setVaultKey(result.vaultKey); setPin("");
             setScreen("unlocked");
@@ -311,21 +313,6 @@ export default function PasswordsPage() {
             setScreen("unlocked");
         } finally { setIsWorking(false); }
     };
-
-    // Auto-submit PIN when complete
-    useEffect(() => {
-        if (screen === "locked" && pin.length === PIN_LENGTH && !isWorking) {
-            void handleUnlockPin();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pin, screen]);
-
-    useEffect(() => {
-        if (setupStep === "confirm" && confirmPin.length === PIN_LENGTH && !isWorking) {
-            void handleSetupConfirmComplete();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [confirmPin, setupStep]);
 
     const handleLock = () => {
         setEntries([]); setVaultKey(null); setRevealedIds(new Set()); setSearch(""); setFormOpen(false); setPin(""); setPinError(null); setScreen("locked");
@@ -494,14 +481,7 @@ export default function PasswordsPage() {
     // ── Loading ────────────────────────────────────────────────────
 
     if (screen === "loading") {
-        return (
-            <main className={`editor-theme ${themeModeClass} flex min-h-screen items-center justify-center bg-(--editor-bg)`}>
-                <div className="flex flex-col items-center gap-3">
-                    <Shield size={28} className="text-(--editor-accent) animate-pulse" />
-                    <p className="text-sm text-(--editor-text-muted)">Loading vault…</p>
-                </div>
-            </main>
-        );
+        return <LoadingScreen icon={Shield} message="Secure Vault" label="Opening Vault" />;
     }
 
     // ── Setup ──────────────────────────────────────────────────────
@@ -541,10 +521,15 @@ export default function PasswordsPage() {
                             <PinPad
                                 value={setupStep === "pin" ? pin : confirmPin}
                                 onChange={setupStep === "pin" ? setPin : setConfirmPin}
-                                onComplete={setupStep === "pin" ? () => { if (pin.length >= PIN_LENGTH) { setSetupStep("confirm"); setConfirmPin(""); } } : undefined}
+                                onComplete={setupStep === "pin" ? (v) => { if (v.length >= PIN_LENGTH) { setSetupStep("confirm"); setConfirmPin(""); } } : handleSetupConfirmComplete}
                                 disabled={isWorking}
                             />
-                            {pinError && <p className="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-sm text-red-700">{pinError}</p>}
+                            {pinError && (
+                                <div className="flex items-center gap-2 text-rose-500 animate-in fade-in slide-in-from-top-1 px-1">
+                                    <AlertCircle size={14} className="shrink-0" />
+                                    <p className="text-[10px] font-bold uppercase tracking-wider">{pinError}</p>
+                                </div>
+                            )}
                             {setupStep === "confirm" && (
                                 <button type="button" onClick={() => { setConfirmPin(""); setPin(""); setSetupStep("pin"); }}
                                     className="text-sm text-(--editor-text-muted) hover:text-(--editor-text) transition-colors"
@@ -561,7 +546,12 @@ export default function PasswordsPage() {
                                 <Fingerprint size={40} className="text-(--editor-accent)" />
                             </button>
                             <p className="text-center text-sm text-(--editor-text-muted)">{isWorking ? "Registering biometric…" : "Tap to register your fingerprint or Face ID"}</p>
-                            {pinError && <p className="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-sm text-red-700">{pinError}</p>}
+                            {pinError && (
+                                <div className="flex items-center gap-2 text-rose-500 animate-in fade-in slide-in-from-top-1 px-1">
+                                    <AlertCircle size={14} className="shrink-0" />
+                                    <p className="text-[10px] font-bold uppercase tracking-wider">{pinError}</p>
+                                </div>
+                            )}
                             <button type="button" onClick={() => { setPinError(null); setSetupStep("biometric-prompt"); }}
                                 className="text-sm text-(--editor-text-muted) hover:text-(--editor-text) transition-colors"
                             >← Back</button>
@@ -594,8 +584,13 @@ export default function PasswordsPage() {
 
                     {hasPin && (
                         <div className="flex flex-col items-center gap-4">
-                            <PinPad value={pin} onChange={setPin} disabled={isWorking} />
-                            {pinError && <p className="w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-center text-sm text-red-700">{pinError}</p>}
+                            <PinPad value={pin} onChange={setPin} onComplete={handleUnlockPin} disabled={isWorking} />
+                            {pinError && (
+                                <div className="flex items-center gap-2 text-rose-500 animate-in fade-in slide-in-from-top-1 px-1">
+                                    <AlertCircle size={14} className="shrink-0" />
+                                    <p className="text-[10px] font-bold uppercase tracking-wider">{pinError}</p>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -711,6 +706,7 @@ export default function PasswordsPage() {
                                     <PinPad
                                         value={retroPin.length < PIN_LENGTH ? retroPin : retroConfirmPin}
                                         onChange={retroPin.length < PIN_LENGTH ? setRetroPin : setRetroConfirmPin}
+                                        onComplete={retroPin.length < PIN_LENGTH ? undefined : handleRetrofitPinComplete}
                                         disabled={isWorking}
                                     />
                                 </div>
@@ -976,7 +972,10 @@ export default function PasswordsPage() {
                             </label>
 
                             {formError && (
-                                <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
+                                <div className="flex items-center gap-2 text-rose-500 animate-in fade-in slide-in-from-top-1 px-1">
+                                    <AlertCircle size={14} className="shrink-0" />
+                                    <p className="text-[10px] font-bold uppercase tracking-wider">{formError}</p>
+                                </div>
                             )}
 
                             <div className="flex gap-2 pt-1">

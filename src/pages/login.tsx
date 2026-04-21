@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
-import { Eye, EyeOff, KeyRound, WandSparkles } from "lucide-react";
+import { Eye, EyeOff, KeyRound, WandSparkles, AlertCircle } from "lucide-react";
 import { loginUser, registerUser } from "@/lib/auth-client";
 import { syncGuestDataToServer } from "@/lib/guest-sync";
 import {
@@ -70,7 +70,7 @@ export default function LoginPage() {
 
             await syncGuestDataToServer();
 
-            await router.replace("/docs");
+            await router.replace("/");
         } catch (submitError) {
             const message =
                 submitError instanceof Error ? submitError.message : "Authentication failed";
@@ -81,12 +81,13 @@ export default function LoginPage() {
     };
 
     return (
-        <main className={`editor-theme ${themeModeClass} flex min-h-screen items-center justify-center bg-gray-50 px-4`}>
-            <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h1 className="text-2xl font-semibold text-gray-900">
+        <main className={`editor-theme ${themeModeClass} flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950 px-4`}>
+            <div className="w-full max-w-md rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-sm">
+
+                <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
                     {mode === "login" ? "Welcome back" : "Create your account"}
                 </h1>
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {mode === "login"
                         ? "Sign in to access your documents."
                         : "Register to start writing and saving documents."}
@@ -127,7 +128,17 @@ export default function LoginPage() {
                     </label>
 
                     <label className="block">
-                        <span className="mb-1 block text-sm text-gray-600">Password</span>
+                        <div className="flex items-center justify-between">
+                            <span className="mb-1 block text-sm text-gray-600">Password</span>
+                            {mode === "login" && (
+                                <Link
+                                    href="/forgot-password"
+                                    className="mb-1 text-xs text-indigo-600 hover:text-indigo-500 transition-colors"
+                                >
+                                    Forgot password?
+                                </Link>
+                            )}
+                        </div>
                         <div className="flex gap-2">
                             <div className="relative flex-1">
                                 <input
@@ -190,9 +201,10 @@ export default function LoginPage() {
                     </p>
 
                     {error && (
-                        <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                            {error}
-                        </p>
+                        <div className="flex items-center gap-2 px-1 text-rose-500 animate-in fade-in slide-in-from-top-1 mb-2">
+                            <AlertCircle className="h-4 w-4 shrink-0" />
+                            <p className="text-xs font-bold uppercase tracking-wide">{error}</p>
+                        </div>
                     )}
 
                     <button
@@ -208,18 +220,20 @@ export default function LoginPage() {
                     </button>
                 </form>
 
-                <div className="mt-4 flex items-center justify-between text-sm">
-                    <button
-                        type="button"
-                        onClick={() => setMode((previous) => (previous === "login" ? "register" : "login"))}
-                        className="cursor-pointer text-indigo-600 hover:text-indigo-500"
-                    >
-                        {mode === "login" ? "Need an account? Register" : "Already have an account? Sign in"}
-                    </button>
+                <div className="mt-4 flex flex-col items-center gap-3 text-sm">
+                    <div className="flex w-full items-center justify-between">
+                        <button
+                            type="button"
+                            onClick={() => setMode((previous) => (previous === "login" ? "register" : "login"))}
+                            className="cursor-pointer text-indigo-600 hover:text-indigo-500"
+                        >
+                            {mode === "login" ? "Need an account? Register" : "Already have an account? Sign in"}
+                        </button>
 
-                    <Link href="/" className="text-gray-500 hover:text-gray-700">
-                        Home
-                    </Link>
+                        <Link href="/" className="text-gray-500 hover:text-gray-700">
+                            Home
+                        </Link>
+                    </div>
                 </div>
             </div>
         </main>
