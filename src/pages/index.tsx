@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, FileText, Search, SortAsc, Clock, LogIn, LogOut, BookOpen, Shield } from "lucide-react";
+import { Plus, Trash2, FileText, Search, SortAsc, Clock, LogIn, LogOut, BookOpen, Shield, ArrowLeft } from "lucide-react";
 import {
   createDocument,
   deleteDocument,
@@ -50,41 +50,32 @@ export default function DocumentsPage() {
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"date" | "name">("date");
-  const [theme] = useState<EditorTheme>(() => {
-    if (typeof window === "undefined") return "docvault-light";
-    return loadGlobalEditorTheme() ?? "docvault-light";
-  });
 
-  const themeDefinition = useMemo(() => getEditorTheme(theme), [theme]);
-  const isDarkTheme = themeDefinition.mode === "dark";
-  const themeModeClass = isDarkTheme ? "editor-theme-dark" : "editor-theme-light";
-  useEffect(() => {
-    applyEditorThemeToHtml(theme);
-  }, [theme]);
+  const [theme, setTheme] = useState<EditorTheme>("docvault-light");
+  const isDarkTheme = theme.includes("dark");
 
-  const pushToast = useCallback((tone: ToastMessage["tone"], message: string) => {
-    setToasts((previous) => [
-      ...previous,
-      { id: crypto.randomUUID(), tone, message },
-    ]);
-  }, []);
+  const pushToast = (tone: ToastMessage["tone"], message: string) => {
+    const id = Math.random().toString(36).slice(2, 9);
+    setToasts((previous) => [...previous, { id, tone, message }]);
+  };
 
-  const dismissToast = useCallback((id: string) => {
+  const dismissToast = (id: string) => {
     setToasts((previous) => previous.filter((toast) => toast.id !== id));
-  }, []);
+  };
 
-  const reload = useCallback(async (guestModeOverride?: boolean) => {
+  const reload = useCallback(async (activeGuestMode: boolean) => {
     setIsLoadingDocs(true);
     try {
-      const activeGuestMode = guestModeOverride ?? isGuestMode;
       const nextDocuments = activeGuestMode
         ? await listGuestDocuments()
         : await listDocuments();
       setDocuments(nextDocuments);
+    } catch (err) {
+      console.error("Failed to load documents:", err);
     } finally {
       setIsLoadingDocs(false);
     }
-  }, [isGuestMode]);
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -100,6 +91,8 @@ export default function DocumentsPage() {
           ? await listGuestDocuments()
           : await listDocuments();
         setDocuments(nextDocuments);
+      } catch (err) {
+        console.error("Failed to initial load documents:", err);
       } finally {
         setIsLoadingDocs(false);
       }
@@ -110,40 +103,26 @@ export default function DocumentsPage() {
     await logoutUser();
     setUser(null);
     setIsGuestMode(true);
-    const nextDocuments = await listGuestDocuments();
-    setDocuments(nextDocuments);
-    pushToast("info", "Signed out");
+    await reload(true);
+    pushToast("success", "Logged out");
   };
-
-  const emptyState = useMemo(() => documents.length === 0, [documents.length]);
-
-  const visibleDocuments = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const filtered = q
-      ? documents.filter((d) => (d.title || "Untitled").toLowerCase().includes(q))
-      : documents;
-    return [...filtered].sort((a, b) =>
-      sort === "name"
-        ? (a.title || "Untitled").localeCompare(b.title || "Untitled")
-        : b.updatedAt - a.updatedAt,
-    );
-  }, [documents, search, sort]);
 
   const handleCreate = async () => {
     try {
-      const doc = isGuestMode
-        ? await createGuestDocument()
+      const newDoc = isGuestMode 
+        ? await createGuestDocument() 
         : await createDocument();
       pushToast("success", "Document created");
-      router.push(`/docs/${doc.id}`);
+      router.push(`/docs/${newDoc.id}`);
     } catch {
-      pushToast("error", "Could not create document");
+      pushToast("error", "Failed to create document");
     }
   };
 
-  const handleDelete = async (id: string) => {
-    const confirmed = window.confirm("Delete this document permanently?");
-    if (!confirmed) return;
+  const handleDelete = async (event: React.MouseEvent, id: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!confirm("Are you sure you want to delete this document?")) return;
 
     try {
       if (isGuestMode) {
@@ -151,20 +130,50 @@ export default function DocumentsPage() {
       } else {
         await deleteDocument(id);
       }
-      await reload();
+      setDocuments((previous) => previous.filter((doc) => doc.id !== id));
       pushToast("success", "Document deleted");
     } catch {
-      pushToast("error", "Could not delete document");
+      pushToast("error", "Failed to delete document");
     }
   };
 
+  useEffect(() => {
+    const saved = loadGlobalEditorTheme();
+    if (saved) {
+      setTheme(saved);
+      applyEditorThemeToHtml(saved);
+    } else {
+      setTheme("docvault-light");
+      applyEditorThemeToHtml("docvault-light");
+    }
+  }, []);
+
+  const filteredDocs = useMemo(() => {
+    let result = [...documents];
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(d => 
+        (d.title || "Untitled").toLowerCase().includes(q) ||
+        d.pages.some(p => p.title.toLowerCase().includes(q))
+      );
+    }
+    result.sort((a, b) => {
+      if (sort === "name") {
+        return (a.title || "Untitled").localeCompare(b.title || "Untitled");
+      }
+      return b.updatedAt - a.updatedAt;
+    });
+    return result;
+  }, [documents, search, sort]);
+
   if (!authChecked) {
-    return <LoadingScreen />;
+    return <LoadingScreen label="Checking session" />;
   }
 
   return (
-    <main className={`editor-theme ${themeModeClass} min-h-screen bg-(--editor-bg) text-(--editor-text)`}>
+    <main className={`min-h-screen bg-(--editor-bg) text-(--editor-text) ${isDarkTheme ? "dark editor-theme-dark" : ""}`}>
       <ToastRegion toasts={toasts} onDismiss={dismissToast} />
+      
       <AuthDialog
         open={isAuthDialogOpen}
         onClose={() => setIsAuthDialogOpen(false)}
@@ -173,76 +182,75 @@ export default function DocumentsPage() {
           setUser(currentUser);
           const nextIsGuestMode = !currentUser;
           setIsGuestMode(nextIsGuestMode);
-          // Pass the new mode directly to reload because state updates are async!
           await reload(nextIsGuestMode);
           pushToast("success", "Signed in and synced");
         }}
       />
 
-      {/* ── Top nav bar ───────────────────────────────────── */}
-      <header className="sticky top-0 z-10 border-b border-(--editor-border) bg-(--editor-bg)/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
-          <div className="flex items-center gap-2.5">
+      <header className="sticky top-0 z-10 border-b border-(--editor-border) bg-(--editor-bg)/90 backdrop-blur text-sm">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-1.5">
+          <div className="flex items-center gap-2">
             <BrandLogo className="h-6 w-6" />
             <span className="text-base font-semibold text-(--editor-text)">Docs</span>
             <span className="text-(--editor-text-muted) opacity-30 select-none">|</span>
             <Link
               href="/passwords"
-              className="flex items-center gap-1.5 text-sm text-(--editor-text-muted) hover:text-(--editor-text) transition-colors"
+              className="flex items-center gap-1.5 text-xs text-(--editor-text-muted) hover:text-(--editor-text) transition-colors"
               title="Password Vault"
             >
-              <Shield size={15} />
+              <BrandLogo className="h-4 w-4" />
               Vault
             </Link>
+            {isGuestMode && (
+              <span className="rounded-full bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 text-[10px] font-bold tracking-tight text-amber-600 dark:text-amber-400 ring-1 ring-amber-200/50 dark:ring-amber-800/30 uppercase">Guest mode</span>
+            )}
           </div>
 
-          {/* Search */}
-          <div className="relative flex-1 max-w-sm">
-            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-(--editor-text-muted)" />
+          <div className="hidden sm:block relative flex-1 max-w-xs">
+            <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-(--editor-text-muted)" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search documents…"
-              className="w-full rounded-lg border border-(--editor-border) bg-(--editor-surface) py-2 pl-9 pr-3 text-sm text-(--editor-text) placeholder:text-(--editor-text-muted) outline-none focus:border-(--editor-accent)"
+              className="w-full rounded-lg border border-(--editor-border) bg-(--editor-surface) py-1 pl-8 pr-3 text-xs text-(--editor-text) placeholder:text-(--editor-text-muted) outline-none focus:border-(--editor-accent)"
             />
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Sort toggle */}
             <button
               onClick={() => setSort((s) => s === "date" ? "name" : "date")}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-(--editor-border) bg-(--editor-surface) px-3 py-2 text-xs font-medium text-(--editor-text-muted) hover:bg-(--editor-surface-muted) transition-colors"
-              title={sort === "date" ? "Sorted by date — click to sort by name" : "Sorted by name — click to sort by date"}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-(--editor-border) bg-(--editor-surface) px-2 py-1 text-xs font-medium text-(--editor-text-muted) hover:bg-(--editor-surface-muted) transition-colors"
+              title={sort === "date" ? "Sorted by date" : "Sorted by name"}
             >
-              {sort === "date" ? <Clock size={14} /> : <SortAsc size={14} />}
+              {sort === "date" ? <Clock size={13} /> : <SortAsc size={13} />}
               {sort === "date" ? "Recent" : "A – Z"}
             </button>
 
             <button
               onClick={() => void handleCreate()}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-(--editor-accent) px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-95"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-(--editor-accent) px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-95"
               title="Create a new document"
             >
-              <Plus size={16} />
+              <Plus size={15} />
               New
             </button>
 
             {isGuestMode ? (
               <button
                 onClick={() => setIsAuthDialogOpen(true)}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-(--editor-border) bg-(--editor-surface) px-3 py-2 text-sm font-medium text-(--editor-text) hover:bg-(--editor-surface-muted) transition-colors"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-(--editor-border) bg-(--editor-surface) px-2 py-1 text-xs font-medium text-(--editor-text) hover:bg-(--editor-surface-muted) transition-colors"
                 title="Sign in to sync documents"
               >
-                <LogIn size={15} />
+                <LogIn size={14} />
                 Sign in
               </button>
             ) : (
               <button
                 onClick={() => void handleLogout()}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-(--editor-border) bg-(--editor-surface) px-3 py-2 text-sm font-medium text-(--editor-text) hover:bg-(--editor-surface-muted) transition-colors"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-(--editor-border) bg-(--editor-surface) px-2 py-1 text-xs font-medium text-(--editor-text) hover:bg-(--editor-surface-muted) transition-colors"
                 title="Sign out"
               >
-                <LogOut size={15} />
+                <LogOut size={14} />
                 Sign out
               </button>
             )}
@@ -250,104 +258,78 @@ export default function DocumentsPage() {
         </div>
       </header>
 
-      {/* ── Main content ──────────────────────────────────── */}
-      <div className="mx-auto max-w-6xl px-6 py-8">
-
-        {/* Identity row */}
-        <div className="mb-6 flex items-center gap-2 text-sm text-(--editor-text-muted)">
-          <span className={`h-2 w-2 rounded-full ${isGuestMode ? "bg-amber-400 animate-pulse" : "bg-emerald-400"}`} />
-          {isGuestMode
-            ? "Guest mode — documents are stored locally"
-            : `Signed in as ${user?.name || user?.email}`}
-          <span className="ml-auto text-xs opacity-60">
-            {documents.length} {documents.length === 1 ? "document" : "documents"}
-          </span>
+      <div className="mx-auto max-w-6xl px-6 py-6">
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-(--editor-text)">Your Documents</h1>
+            <p className="mt-0.5 text-xs text-(--editor-text-muted)">
+              {isLoadingDocs ? "Refreshing..." : `${filteredDocs.length} items`}
+            </p>
+          </div>
         </div>
 
-        {/* Loading state / Empty state */}
-        {isLoadingDocs ? (
+        {isLoadingDocs && documents.length === 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="h-32 w-full animate-pulse rounded-2xl border border-(--editor-border) bg-(--editor-surface)/50" />
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-32 rounded-xl border border-(--editor-border) bg-(--editor-surface)/50 animate-pulse" />
             ))}
           </div>
-        ) : emptyState ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-(--editor-border) bg-(--editor-surface)/40 px-8 py-20 text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-(--editor-surface) shadow-sm ring-1 ring-(--editor-border)">
-              <FileText size={26} className="text-(--editor-accent)" />
+        ) : filteredDocs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-(--editor-border) bg-(--editor-surface)/30 py-16 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-(--editor-surface-muted) text-(--editor-text-muted)">
+              <Search size={24} />
             </div>
-            <p className="text-base font-semibold text-(--editor-text)">No documents yet</p>
-            <p className="mt-1 text-sm text-(--editor-text-muted)">Create your first document to get started.</p>
-            <button
-              onClick={() => void handleCreate()}
-              className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-(--editor-accent) px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:opacity-90 active:scale-95"
-            >
-              <Plus size={16} />
-              Create document
-            </button>
-          </div>
-        ) : visibleDocuments.length === 0 ? (
-          /* No search results */
-          <div className="mt-8 text-center text-sm text-(--editor-text-muted)">
-            No documents match <span className="font-medium text-(--editor-text)">&ldquo;{search}&rdquo;</span>
-          </div>
-        ) : (
-          /* Card grid */
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {visibleDocuments.map((doc) => {
-              const pageCount = doc.pages?.length ?? 1;
-              return (
-                <li key={doc.id} className="group relative flex flex-col rounded-2xl border border-(--editor-border) bg-(--editor-surface) shadow-sm transition-all hover:shadow-md hover:border-(--editor-accent)/40 hover:-translate-y-0.5">
-                  <Link
-                    href={`/docs/${doc.id}/${doc.activePageId}`}
-                    className="flex flex-1 flex-col gap-2 p-5"
-                  >
-                    {/* Doc icon + title */}
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-(--editor-accent)/10">
-                        <FileText size={16} className="text-(--editor-accent)" />
-                      </div>
-                      <p className="line-clamp-2 text-sm font-semibold leading-snug text-(--editor-text)">
-                        {doc.title || "Untitled"}
-                      </p>
-                    </div>
-
-                    {/* Meta row */}
-                    <div className="mt-auto flex items-center gap-3 pt-3 text-xs text-(--editor-text-muted)">
-                      <span className="flex items-center gap-1">
-                        <Clock size={11} />
-                        {relativeTime(doc.updatedAt)}
-                      </span>
-                      <span className="ml-auto rounded-full bg-(--editor-surface-muted) px-2 py-0.5 font-medium">
-                        {pageCount} {pageCount === 1 ? "page" : "pages"}
-                      </span>
-                    </div>
-                  </Link>
-
-                  {/* Delete — appears on hover, positioned top-right */}
-                  <button
-                    onClick={() => void handleDelete(doc.id)}
-                    className="absolute right-2.5 top-2.5 rounded-lg p-1.5 text-(--editor-text-muted) opacity-0 transition-all group-hover:opacity-100 hover:bg-red-50 hover:text-red-500"
-                    aria-label="Delete document"
-                    title="Delete document"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </li>
-              );
-            })}
-
-            {/* New-doc card */}
-            <li>
+            <h3 className="mt-4 text-base font-semibold text-(--editor-text)">No documents found</h3>
+            <p className="mt-1 text-xs text-(--editor-text-muted)">
+              {search ? "Try adjusting your search query." : "Create your first document."}
+            </p>
+            {!search && (
               <button
                 onClick={() => void handleCreate()}
-                className="flex h-full w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-(--editor-border) bg-(--editor-surface)/40 p-8 text-sm text-(--editor-text-muted) transition-colors hover:border-(--editor-accent)/50 hover:bg-(--editor-surface) hover:text-(--editor-accent)"
+                className="mt-6 inline-flex items-center gap-2 rounded-lg bg-(--editor-accent) px-5 py-2 text-sm font-semibold text-white transition-all hover:opacity-90 grayscale-[0.2]"
               >
-                <Plus size={20} />
-                New document
+                <Plus size={16} />
+                Create Document
               </button>
-            </li>
-          </ul>
+            )}
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {filteredDocs.map((doc) => (
+              <Link
+                key={doc.id}
+                href={`/docs/${doc.id}`}
+                className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-(--editor-border) bg-(--editor-surface) p-4 shadow-sm transition-all hover:border-(--editor-accent)/50 hover:shadow-md"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-(--editor-surface-muted) text-(--editor-accent) transition-colors group-hover:bg-(--editor-accent) group-hover:text-white">
+                    <FileText size={18} />
+                  </div>
+                  <button
+                    onClick={(e) => void handleDelete(e, doc.id)}
+                    className="rounded-md p-1.5 text-(--editor-text-muted) hover:bg-red-50 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                    title="Delete document"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+
+                <div className="mt-3">
+                  <h3 className="text-sm font-semibold truncate text-(--editor-text) group-hover:text-(--editor-accent) transition-colors">
+                    {doc.title || "Untitled"}
+                  </h3>
+                  <p className="mt-0.5 text-[11px] text-(--editor-text-muted)">
+                    {doc.pages.length} {doc.pages.length === 1 ? "page" : "pages"}
+                  </p>
+                </div>
+
+                <div className="mt-3 flex items-center gap-2 border-t border-(--editor-surface-muted) pt-2.5 text-[10px] text-(--editor-text-muted)">
+                   <Clock size={11} className="opacity-60" />
+                   <span>{relativeTime(doc.updatedAt)}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
         )}
       </div>
     </main>

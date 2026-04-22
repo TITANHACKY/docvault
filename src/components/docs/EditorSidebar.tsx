@@ -99,7 +99,7 @@ function EditorSidebar(props: EditorSidebarProps) {
                 />
             )}
 
-            <div className="w-10 border-l border-gray-200 bg-white flex flex-col items-center py-3 gap-1">
+            <div className="w-8 border-l border-gray-200 bg-white flex flex-col items-center py-2 gap-0.5">
                 {[
                     { id: "comments", icon: MessageSquare },
                     { id: "styles", icon: Type },
@@ -118,12 +118,12 @@ function EditorSidebar(props: EditorSidebarProps) {
                             }}
                             title={isDisabled ? `Available after sign in` : `Open ${item.id} panel`}
                             disabled={isDisabled}
-                            className={`p-1.5 rounded-md transition-colors ${props.activePanel === item.id
+                            className={`p-1 rounded transition-colors ${props.activePanel === item.id
                                 ? "bg-indigo-100 text-indigo-600"
                                 : "text-gray-400 hover:text-gray-600 hover:bg-gray-100"
                                 } cursor-pointer disabled:cursor-not-allowed disabled:opacity-40`}
                         >
-                            <item.icon size={17} />
+                            <item.icon size={15} />
                         </button>
                     );
                 }
@@ -147,9 +147,9 @@ function EditorSidebar(props: EditorSidebarProps) {
                             props.setTheme(modeThemes[nextIndexInMode].key);
                         }}
                         title={activeTheme.mode === "light" ? "Switch to Dark Mode" : "Switch to Light Mode"}
-                        className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+                        className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
                     >
-                        {activeTheme.mode === "light" ? <Moon size={17} /> : <Sun size={17} />}
+                        {activeTheme.mode === "light" ? <Moon size={15} /> : <Sun size={15} />}
                     </button>
                 </div>
             </div>

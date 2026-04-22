@@ -622,10 +622,10 @@ export default function PasswordsPage() {
 
             {/* ── Sticky nav ── */}
             <header className="sticky top-0 z-10 border-b border-(--editor-border) bg-(--editor-bg)/90 backdrop-blur">
-                <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-2">
-                    <div className="flex items-center gap-2.5 shrink-0">
-                        <Link href="/" className="flex items-center gap-1.5 text-sm text-(--editor-text-muted) hover:text-(--editor-text) transition-colors">
-                            <ArrowLeft size={14} />
+                <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-1.5">
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Link href="/" className="flex items-center gap-1 text-xs text-(--editor-text-muted) hover:text-(--editor-text) transition-colors">
+                            <ArrowLeft size={13} />
                             Docs
                         </Link>
                         <span className="text-(--editor-text-muted) opacity-30">/</span>

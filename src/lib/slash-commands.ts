@@ -26,6 +26,7 @@ import {
   LayoutList,
   Bookmark,
   Link,
+  Image,
 } from "lucide-react";
 
 interface CommandProps {
@@ -373,6 +374,17 @@ const allCommands: SlashCommandItem[] = [
     action: ({ editor, range, openButtonBuilder }) => {
       editor.chain().focus().deleteRange(range).run();
       openButtonBuilder?.();
+    },
+  },
+  {
+    title: "Image",
+    icon: Image,
+    category: "ADVANCED BLOCKS",
+    action: ({ editor, range }) => {
+      const url = window.prompt("Enter image URL:");
+      if (url) {
+        editor.chain().focus().deleteRange(range).setImage({ src: url }).run();
+      }
     },
   },
   {
