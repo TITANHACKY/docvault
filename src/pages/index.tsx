@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, FileText, Search, SortAsc, Clock, LogIn, LogOut, BookOpen, Shield, ArrowLeft } from "lucide-react";
+import { Plus, Trash2, FileText, Search, SortAsc, Clock, LogIn, LogOut, PenLine, ArrowRight } from "lucide-react";
 import {
   createDocument,
   deleteDocument,
@@ -16,7 +16,6 @@ import BrandLogo from "@/components/ui/BrandLogo";
 import { getCurrentUser, logoutUser, type AuthUser } from "@/lib/auth-client";
 import AuthDialog from "@/components/auth/AuthDialog";
 import {
-  getEditorTheme,
   loadGlobalEditorTheme,
   type EditorTheme,
 } from "@/lib/editor-themes";
@@ -26,6 +25,7 @@ import {
   deleteGuestDocument,
   listGuestDocuments,
 } from "@/lib/guest-documents";
+import { loadLastOpened, type LastOpenedEntry } from "@/lib/last-opened";
 
 function relativeTime(ts: number): string {
   const diff = Date.now() - ts;
@@ -53,6 +53,7 @@ export default function DocumentsPage() {
 
   const [theme, setTheme] = useState<EditorTheme>("docvault-light");
   const isDarkTheme = theme.includes("dark");
+  const [lastOpened, setLastOpened] = useState<LastOpenedEntry | null>(null);
 
   const pushToast = (tone: ToastMessage["tone"], message: string) => {
     const id = Math.random().toString(36).slice(2, 9);
@@ -146,7 +147,21 @@ export default function DocumentsPage() {
       setTheme("docvault-light");
       applyEditorThemeToHtml("docvault-light");
     }
+    setLastOpened(loadLastOpened());
   }, []);
+
+  /* Cmd+N / Ctrl+N quick capture */
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "n") {
+        e.preventDefault();
+        void handleCreate();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGuestMode]);
 
   const filteredDocs = useMemo(() => {
     let result = [...documents];
@@ -259,6 +274,34 @@ export default function DocumentsPage() {
       </header>
 
       <div className="mx-auto max-w-6xl px-6 py-6">
+
+        {/* Continue writing card */}
+        {lastOpened && (
+          <Link
+            href={lastOpened.pageId ? `/docs/${lastOpened.docId}/${lastOpened.pageId}` : `/docs/${lastOpened.docId}`}
+            className="group mb-6 flex items-center justify-between gap-4 rounded-xl border border-(--editor-border) bg-(--editor-surface) px-4 py-3 shadow-sm transition-all hover:border-(--editor-accent)/50 hover:shadow-md"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-(--editor-accent)/10 text-(--editor-accent)">
+                <PenLine size={17} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-(--editor-text-muted)">Continue writing</p>
+                <p className="truncate text-sm font-semibold text-(--editor-text) group-hover:text-(--editor-accent) transition-colors">
+                  {lastOpened.pageTitle || lastOpened.docTitle}
+                </p>
+                {lastOpened.pageTitle && (
+                  <p className="text-[11px] text-(--editor-text-muted) truncate">{lastOpened.docTitle}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2 text-[11px] text-(--editor-text-muted)">
+              <span>{relativeTime(lastOpened.updatedAt)}</span>
+              <ArrowRight size={14} className="opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+            </div>
+          </Link>
+        )}
+
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold tracking-tight text-(--editor-text)">Your Documents</h1>
@@ -332,6 +375,15 @@ export default function DocumentsPage() {
           </div>
         )}
       </div>
+
+      {/* Floating quick-capture button */}
+      <button
+        onClick={() => void handleCreate()}
+        title="New note (⌘N)"
+        className="fixed bottom-6 right-6 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-(--editor-accent) text-white shadow-lg transition-all hover:opacity-90 hover:scale-105 active:scale-95"
+      >
+        <Plus size={22} />
+      </button>
     </main>
   );
 }

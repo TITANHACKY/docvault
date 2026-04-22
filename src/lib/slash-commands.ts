@@ -7,12 +7,10 @@ import {
   List,
   ListOrdered,
   TextQuote,
-  Quote,
   Code,
   CheckSquare,
   Minus,
   Type,
-  Flag,
   ListCollapse,
   Bold,
   Italic,
@@ -219,29 +217,13 @@ const allCommands: SlashCommandItem[] = [
       );
     },
   },
-  {
-    title: "Strong red banner",
-    icon: Flag,
-    category: "TEXT",
-    action: ({ editor, range }) => {
-      insertCallout(editor, range, "strong-red");
-    },
-  },
-  createBannerCommand("Strong orange banner", "strong-orange"),
-  createBannerCommand("Strong yellow banner", "strong-yellow"),
-  createBannerCommand("Strong blue banner", "strong-blue"),
-  createBannerCommand("Strong purple banner", "strong-purple"),
-  createBannerCommand("Strong pink banner", "strong-pink"),
-  createBannerCommand("Strong green banner", "strong-green"),
-  createBannerCommand("Strong grey banner", "strong-grey"),
-  createBannerCommand("Red banner", "red"),
-  createBannerCommand("Orange banner", "orange"),
-  createBannerCommand("Yellow banner", "yellow"),
-  createBannerCommand("Blue banner", "blue"),
-  createBannerCommand("Purple banner", "purple"),
-  createBannerCommand("Pink banner", "pink"),
-  createBannerCommand("Green banner", "green"),
-  createBannerCommand("Grey banner", "grey"),
+  createBannerCommand("Callout red", "red"),
+  createBannerCommand("Callout orange", "orange"),
+  createBannerCommand("Callout yellow", "yellow"),
+  createBannerCommand("Callout blue", "blue"),
+  createBannerCommand("Callout purple", "purple"),
+  createBannerCommand("Callout green", "green"),
+  createBannerCommand("Callout grey", "grey"),
   {
     title: "Code block",
     icon: Code,
@@ -258,15 +240,6 @@ const allCommands: SlashCommandItem[] = [
       editor.chain().focus().deleteRange(range).toggleBlockquote().run();
     },
   },
-  {
-    title: "Pull quote",
-    icon: Quote,
-    category: "TEXT",
-    action: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleBlockquote().run();
-    },
-  },
-
   // --- FORMATTING ---
   {
     title: "Clear format",

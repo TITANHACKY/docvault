@@ -34,6 +34,10 @@ export default function DocEditorPage() {
         setToasts((prev) => prev.filter((t) => t.id !== id));
     }, []);
 
+    const onInfo = useCallback((msg: string) => pushToast("info", msg), [pushToast]);
+    const onSuccess = useCallback((msg: string) => pushToast("success", msg), [pushToast]);
+    const onError = useCallback((msg: string) => pushToast("error", msg), [pushToast]);
+
     /* ── Document sync ──────────────────────────────────────── */
     const {
         documentTitle, setDocumentTitle,
@@ -41,21 +45,14 @@ export default function DocEditorPage() {
         saveState, isOnline, authChecked, isGuestMode, setIsGuestMode,
         selectPage, handleCreatePage, handleDeletePage,
         handlePageTitleChange, handlePageContentChange,
-    } = useDocumentSync({
-        docId,
-        onInfo: (msg) => pushToast("info", msg),
-        onSuccess: (msg) => pushToast("success", msg),
-        onError: (msg) => pushToast("error", msg),
-    });
+    } = useDocumentSync({ docId, onInfo, onSuccess, onError });
 
     /* ── Editor preferences ─────────────────────────────────── */
     const [prefs, prefActions] = useEditorPreferences(docId);
 
     /* ── Comments ───────────────────────────────────────────── */
     const { comments, setComments, isAddingComment, handleAddComment } = useCommentSystem({
-        docId, authChecked, isGuestMode,
-        onSuccess: (msg) => pushToast("success", msg),
-        onError: (msg) => pushToast("error", msg),
+        docId, authChecked, isGuestMode, onSuccess, onError,
     });
 
     /* ── UI state ───────────────────────────────────────────── */
@@ -63,28 +60,26 @@ export default function DocEditorPage() {
     const [activePanel, setActivePanel] = useState<string | null>(null);
     const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
 
-    const pendingQueryPageRef = useRef<string | null>(null);
     const onOpenLinkedPageRef = useRef<((id: string) => void) | null>(null);
+    const routerReplaceRef = useRef(router.replace);
+    useEffect(() => { routerReplaceRef.current = router.replace; });
 
     /* ── URL <-> page sync ──────────────────────────────────── */
+    /* Read: URL page segment → select page in state */
+    const urlPageId = router.isReady && typeof router.query.page === "string" ? router.query.page : null;
     useEffect(() => {
-        if (!router.isReady) return;
-        const pageFromQuery = typeof router.query.page === "string" ? router.query.page : null;
-        if (pendingQueryPageRef.current) {
-            if (pageFromQuery === pendingQueryPageRef.current) pendingQueryPageRef.current = null;
-            return;
-        }
-        if (!pageFromQuery || !pages.some((p) => p.id === pageFromQuery) || pageFromQuery === activePageId) return;
-        selectPage(pageFromQuery);
-    }, [router.isReady, router.query.page, pages, activePageId, selectPage]);
+        if (!urlPageId || !pages.some((p) => p.id === urlPageId) || urlPageId === activePageId) return;
+        selectPage(urlPageId);
+    }, [urlPageId, pages, activePageId, selectPage]);
 
+    /* Write: active page state → update URL (shallow, no navigation) */
     useEffect(() => {
         if (!router.isReady || !docId || !activePageId) return;
-        const pageFromQuery = typeof router.query.page === "string" ? router.query.page : null;
-        if (pageFromQuery === activePageId) return;
-        pendingQueryPageRef.current = activePageId;
-        void router.replace(`/docs/${docId}/${activePageId}`, undefined, { shallow: true });
-    }, [router.isReady, docId, activePageId, router]);
+        if (urlPageId === activePageId) return;
+        void routerReplaceRef.current(`/docs/${docId}/${activePageId}`, undefined, { shallow: true });
+    // router.isReady is stable once true; urlPageId/activePageId/docId are the real deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [router.isReady, docId, activePageId]);
 
     /* ── Derived ────────────────────────────────────────────── */
     const { fontSizeClass, isDarkTheme, themeModeClass } = prefActions;
@@ -155,7 +150,8 @@ export default function DocEditorPage() {
                         />
                         <button
                             onClick={() => prefActions.setIsPagesSidebarOpen(false)}
-                            className="lg:hidden cursor-pointer rounded-md p-1 text-gray-500 hover:bg-gray-100"
+                            className="cursor-pointer rounded-md p-1 text-(--editor-text-muted) hover:bg-(--editor-surface-muted)"
+                            title="Close pages sidebar"
                         >
                             <ChevronsLeft size={14} />
                         </button>

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { CheckCircle2, AlertCircle, Info } from "lucide-react";
 
 export interface ToastMessage {
@@ -13,10 +13,10 @@ interface ToastRegionProps {
     onDismiss: (id: string) => void;
 }
 
-const toneClasses: Record<ToastMessage["tone"], string> = {
-    success: "border-emerald-200 bg-emerald-50 text-emerald-900",
-    error: "border-rose-200 bg-rose-50 text-rose-900",
-    info: "border-sky-200 bg-sky-50 text-sky-900",
+const toneStyles: Record<ToastMessage["tone"], React.CSSProperties> = {
+    success: { background: "color-mix(in srgb, #22c55e 12%, var(--editor-surface))", borderColor: "color-mix(in srgb, #22c55e 30%, var(--editor-border))", color: "color-mix(in srgb, #15803d 80%, var(--editor-text))" },
+    error: { background: "color-mix(in srgb, #ef4444 12%, var(--editor-surface))", borderColor: "color-mix(in srgb, #ef4444 30%, var(--editor-border))", color: "color-mix(in srgb, #b91c1c 80%, var(--editor-text))" },
+    info: { background: "color-mix(in srgb, #3b82f6 12%, var(--editor-surface))", borderColor: "color-mix(in srgb, #3b82f6 30%, var(--editor-border))", color: "color-mix(in srgb, #1d4ed8 80%, var(--editor-text))" },
 };
 
 const toneIcon: Record<ToastMessage["tone"], typeof CheckCircle2> = {
@@ -50,7 +50,8 @@ export default function ToastRegion({ toasts, onDismiss }: ToastRegionProps) {
                 return (
                     <div
                         key={toast.id}
-                        className={`pointer-events-auto flex items-start gap-2 rounded-xl border px-3 py-2 text-sm shadow-sm ${toneClasses[toast.tone]}`}
+                        className="pointer-events-auto flex items-start gap-2 rounded-xl border px-3 py-2 text-sm shadow-sm"
+                        style={toneStyles[toast.tone]}
                         role="status"
                         aria-live="polite"
                     >

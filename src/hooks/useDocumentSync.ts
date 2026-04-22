@@ -3,6 +3,7 @@ import { getDocument, upsertDocument, type StoredPage } from "@/lib/documents";
 import { createGuestDocument, getGuestDocument, upsertGuestDocument } from "@/lib/guest-documents";
 import { loadEncryptedDraft, saveEncryptedDraft, type EditorDraftPayload } from "@/lib/local-draft";
 import { getCurrentUser } from "@/lib/auth-client";
+import { saveLastOpened } from "@/lib/last-opened";
 
 /* ─── Pure helpers (no hooks) ────────────────────────────── */
 
@@ -179,13 +180,14 @@ export function useDocumentSync({ docId, onInfo, onSuccess, onError }: UseDocume
         return () => clearTimeout(timeout);
     }, [docId, onInfo, onSuccess, onError]);
 
-    /* Auto-save encrypted draft */
+    /* Auto-save encrypted draft + track last opened */
     useEffect(() => {
         if (!authChecked || !docId || !isDocumentReady || pages.length === 0) return;
         const activePage = pages.find((p) => p.id === activePageId) ?? pages[0];
         if (!activePage) return;
         const timeout = window.setTimeout(() => {
             void saveEncryptedDraft(docId, { title: documentTitle.trim() || "Doc", pages, activePageId: activePage.id, updatedAt: Date.now() });
+            saveLastOpened({ docId, pageId: activePage.id, docTitle: documentTitle.trim() || "Doc", pageTitle: activePage.title || null, updatedAt: Date.now() });
         }, 250);
         return () => window.clearTimeout(timeout);
     }, [authChecked, docId, documentTitle, pages, activePageId, isDocumentReady]);
