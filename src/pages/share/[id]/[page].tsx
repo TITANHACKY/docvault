@@ -92,7 +92,7 @@ export default function ShareViewer() {
   return (
     <>
       <Head>
-        <title>{activePage.title || doc.title || "Untitled"} – DocVault</title>
+        <title>{activePage.title || "Untitled"} – DocVault</title>
       </Head>
       <div className="flex h-screen overflow-hidden bg-gray-50 font-sans">
         {/* Sidebar — only shown if multiple pages */}
