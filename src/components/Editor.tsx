@@ -520,7 +520,7 @@ const TiptapEditor = ({
                 onChange={(e) => { onTitleChange(e.target.value); resizeTitle(e.target); }}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); editor?.chain().focus().run(); } }}
                 ref={(el) => { if (el) resizeTitle(el); }}
-                className={`w-full text-[1.75rem] font-semibold leading-[1.2] tracking-tight bg-transparent resize-none border-none outline-none placeholder:text-[#4b5563] mb-2 ${fontClass}`}
+                className={`w-full text-[1.5rem] font-semibold leading-[1.2] tracking-tight bg-transparent resize-none border-none outline-none placeholder:text-[#4b5563] mb-2 ${fontClass}`}
             />
 
             {/* Metadata */}

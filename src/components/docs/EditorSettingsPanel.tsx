@@ -90,16 +90,16 @@ function renderPanelContent(panel: string | null, props: EditorSettingsPanelProp
 
 export default function EditorSettingsPanel(props: EditorSettingsPanelProps) {
     return (
-        <aside className="w-60 border-l border-gray-200 bg-white overflow-y-auto max-h-screen">
-            <div className="p-3">
-                <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-xs font-semibold text-gray-800">{props.activePanelTitle}</h2>
+        <aside className="w-64 border-l border-gray-200 bg-white overflow-y-auto max-h-screen">
+            <div className="px-4 pt-4 pb-2">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-base font-semibold text-gray-900">{props.activePanelTitle}</h2>
                     <button
                         onClick={props.onClose}
-                        className="p-1 rounded hover:bg-gray-100 text-gray-400 cursor-pointer"
+                        className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 cursor-pointer transition-colors"
                         title="Close panel"
                     >
-                        <ChevronsRight size={14} />
+                        <ChevronsRight size={16} />
                     </button>
                 </div>
                 {renderPanelContent(props.activePanel, props)}
