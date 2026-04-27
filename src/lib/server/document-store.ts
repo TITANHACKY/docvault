@@ -4,6 +4,7 @@ import {
   createDocumentPrisma,
   deleteDocumentPrisma,
   getDocumentPrisma,
+  getPublicDocumentPrisma,
   listCommentsPrisma,
   listDocumentsPrisma,
   upsertDocumentPrisma,
@@ -75,6 +76,12 @@ export async function upsertDocumentDb(
     return upsertDocumentPrisma(userId, document);
   }
   return upsertDocumentFile(document);
+}
+
+export async function getPublicDocumentDb(id: string): Promise<StoredDocument | null> {
+  if (isPostgresStore()) return getPublicDocumentPrisma(id);
+  const doc = await getDocumentFile(id);
+  return doc?.isPublic && doc.sharedPageIds && doc.sharedPageIds.length > 0 ? doc : null;
 }
 
 export async function deleteDocumentDb(

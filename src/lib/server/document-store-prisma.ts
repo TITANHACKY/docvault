@@ -34,6 +34,8 @@ function toStoredDocument(record: {
   pages: unknown;
   activePageId: string;
   ownerId: string;
+  isPublic?: boolean;
+  sharedPageIds?: string[];
   createdAt: Date;
   updatedAt: Date;
 }): StoredDocument {
@@ -44,9 +46,17 @@ function toStoredDocument(record: {
     pages: parsePages(record.pages),
     activePageId: record.activePageId,
     ownerId: record.ownerId,
+    isPublic: record.isPublic ?? false,
+    sharedPageIds: Array.isArray(record.sharedPageIds) ? record.sharedPageIds : [],
     createdAt: toTimestamp(record.createdAt),
     updatedAt: toTimestamp(record.updatedAt),
   };
+}
+
+export async function getPublicDocumentPrisma(id: string): Promise<StoredDocument | null> {
+  const row = await prisma.document.findFirst({ where: { id, isPublic: true, sharedPageIds: { isEmpty: false } } });
+  if (!row) return null;
+  return toStoredDocument(row);
 }
 
 function toStoredComment(record: {
@@ -140,6 +150,8 @@ export async function upsertDocumentPrisma(
       pages: document.pages as unknown as Prisma.InputJsonValue,
       activePageId: document.activePageId,
       ownerId: userId,
+      isPublic: document.isPublic ?? false,
+      sharedPageIds: document.sharedPageIds ?? [],
       createdAt: new Date(document.createdAt),
       updatedAt: new Date(document.updatedAt),
     },
@@ -150,6 +162,8 @@ export async function upsertDocumentPrisma(
       pages: document.pages as unknown as Prisma.InputJsonValue,
       activePageId: document.activePageId,
       ownerId: userId,
+      isPublic: document.isPublic ?? false,
+      sharedPageIds: document.sharedPageIds ?? [],
       createdAt: new Date(document.createdAt),
       updatedAt: new Date(document.updatedAt),
     },

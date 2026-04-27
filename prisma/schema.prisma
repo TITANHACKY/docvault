@@ -39,6 +39,8 @@ model Document {
     pages        Json
     activePageId String
     ownerId      String
+    isPublic      Boolean  @default(false)
+    sharedPageIds String[]
     createdAt    DateTime
     updatedAt    DateTime
     owner        User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
@@ -46,6 +48,7 @@ model Document {
 
     @@index([ownerId])
     @@index([updatedAt])
+    @@index([isPublic])
 }
 
 model Comment {

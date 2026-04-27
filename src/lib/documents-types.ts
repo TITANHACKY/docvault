@@ -13,6 +13,8 @@ export interface StoredDocument {
   pages: StoredPage[];
   activePageId: string;
   ownerId?: string;
+  isPublic?: boolean;
+  sharedPageIds?: string[];
   createdAt: number;
   updatedAt: number;
 }

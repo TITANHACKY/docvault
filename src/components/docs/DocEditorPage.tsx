@@ -3,7 +3,8 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
-import { ArrowLeft, ChevronsLeft, FileText, Plus, Trash2 } from "lucide-react";
+import Head from "next/head";
+import { ArrowLeft, ChevronsLeft, FileText, Link2, Plus, Trash2 } from "lucide-react";
 import TiptapEditor from "@/components/Editor";
 import EditorSidebar from "@/components/docs/EditorSidebar";
 import { downloadTextFile, htmlToMarkdown, htmlToPlainText } from "@/lib/export";
@@ -59,6 +60,8 @@ export default function DocEditorPage() {
     const [stats, setStats] = useState<EditorStats>({ words: 0, characters: 0 });
     const [activePanel, setActivePanel] = useState<string | null>(null);
     const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
+    const [sharedPageIds, setSharedPageIds] = useState<string[]>([]);
+    const [isSharing, setIsSharing] = useState(false);
 
     const onOpenLinkedPageRef = useRef<((id: string) => void) | null>(null);
     const routerReplaceRef = useRef(router.replace);
@@ -118,6 +121,34 @@ export default function DocEditorPage() {
 
     const handleStatsChange = useCallback((nextStats: EditorStats) => setStats(nextStats), []);
 
+    const isCurrentPageShared = activePageId ? sharedPageIds.includes(activePageId) : false;
+
+    const handleShare = useCallback(async () => {
+        if (!docId || isGuestMode || !activePageId) return;
+        setIsSharing(true);
+        try {
+            const res = await fetch(`/api/documents/${docId}/share`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pageId: activePageId }),
+            });
+            if (!res.ok) throw new Error();
+            const data = await res.json() as { sharedPageIds: string[] };
+            setSharedPageIds(data.sharedPageIds);
+            const nowShared = data.sharedPageIds.includes(activePageId);
+            if (nowShared) {
+                await navigator.clipboard.writeText(`${window.location.origin}/share/${docId}`);
+                pushToast("success", "Page shared — link copied to clipboard");
+            } else {
+                pushToast("info", "Page removed from share");
+            }
+        } catch {
+            onError("Failed to update sharing");
+        } finally {
+            setIsSharing(false);
+        }
+    }, [docId, isGuestMode, activePageId, sharedPageIds, setSharedPageIds, pushToast, onError]);
+
     /* ── Render ─────────────────────────────────────────────── */
     if (!activePage) {
         return <LoadingScreen message={authChecked ? "Entering Vault" : "DocVault"} label={authChecked ? "Opening document" : "Checking session"} />;
@@ -125,6 +156,9 @@ export default function DocEditorPage() {
 
     return (
         <main className={`editor-theme ${themeModeClass} flex h-screen overflow-hidden bg-white`}>
+            <Head>
+                <title>{activePage.title ? `${activePage.title} – DocVault` : "DocVault"}</title>
+            </Head>
             <ToastRegion toasts={toasts} onDismiss={dismissToast} />
             <AuthDialog
                 open={isAuthDialogOpen}
@@ -234,6 +268,18 @@ export default function DocEditorPage() {
                             <span className="text-gray-300">|</span>
                             <span>{!isOnline ? "Local draft" : saveState === "saving" ? "Saving" : saveState === "error" ? "Save failed" : "Saved"}</span>
                         </div>
+
+                        {!isGuestMode && (
+                            <button
+                                onClick={() => { void handleShare(); }}
+                                disabled={isSharing}
+                                title={isCurrentPageShared ? "This page is shared — click to unshare" : "Share this page as a view-only link"}
+                                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold ring-1 ring-inset transition-all disabled:opacity-50 ${isCurrentPageShared ? "bg-indigo-50 text-indigo-600 ring-indigo-200 hover:bg-indigo-100" : `bg-(--editor-surface) text-(--editor-text) ring-(--editor-border) hover:bg-gray-50 ${isDarkTheme ? "border-white/20 bg-black/30 text-slate-300 hover:bg-white/10" : ""}`}`}
+                            >
+                                <Link2 size={13} />
+                                {isCurrentPageShared ? "Shared" : "Share"}
+                            </button>
+                        )}
 
                         {isGuestMode ? (
                             <button

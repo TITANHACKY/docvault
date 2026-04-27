@@ -227,7 +227,7 @@ export function useDocumentSync({ docId, onInfo, onSuccess, onError }: UseDocume
                     const mergedActivePage = mergedPages.find((p) => p.id === safeActiveId) ?? mergedPages[0] ?? activePage;
 
                     const saved = await upsertDocument(
-                        { id: docId, title: localTitle, content: mergedActivePage.content, pages: mergedPages, activePageId: safeActiveId, createdAt: remote?.createdAt ?? now, updatedAt: now },
+                        { id: docId, title: localTitle, content: mergedActivePage.content, pages: mergedPages, activePageId: safeActiveId, createdAt: remote?.createdAt ?? now, updatedAt: now, isPublic: remote?.isPublic, sharedPageIds: remote?.sharedPageIds },
                         { signal: controller.signal },
                     );
                     if (controller.signal.aborted || latestSaveTokenRef.current !== thisSaveToken) return;

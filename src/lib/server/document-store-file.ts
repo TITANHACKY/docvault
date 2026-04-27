@@ -84,6 +84,8 @@ function normalizeDocument(input: Partial<StoredDocument>): StoredDocument {
       typeof input.content === "string" ? input.content : activePage.content,
     pages,
     activePageId,
+    isPublic: input.isPublic ?? false,
+    sharedPageIds: Array.isArray(input.sharedPageIds) ? input.sharedPageIds : [],
     createdAt: typeof input.createdAt === "number" ? input.createdAt : now,
     updatedAt: typeof input.updatedAt === "number" ? input.updatedAt : now,
   };
