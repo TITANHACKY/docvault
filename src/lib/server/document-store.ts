@@ -111,12 +111,13 @@ export async function addCommentDb(
   content: string,
   author = "You",
   userId?: string,
+  pageId?: string,
 ): Promise<StoredComment> {
   if (isPostgresStore()) {
     if (!userId) {
       throw new Error("userId required for postgres comment create");
     }
-    return addCommentPrisma(documentId, userId, content, author);
+    return addCommentPrisma(documentId, userId, content, author, pageId);
   }
   return addCommentFile(documentId, content, author);
 }

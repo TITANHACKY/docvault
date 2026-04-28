@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getDocumentDb, upsertDocumentDb } from "@/lib/server/document-store";
 import { requireAuth } from "@/lib/server/auth";
+import { prisma } from "@/lib/server/prisma";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "PUT") {
@@ -14,28 +15,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const id = typeof req.query.id === "string" ? req.query.id : null;
   if (!id) return res.status(400).json({ error: "Invalid document id" });
 
-  const doc = await getDocumentDb(id, user.id);
-  if (!doc) return res.status(404).json({ error: "Document not found" });
-  if (doc.ownerId && doc.ownerId !== user.id) return res.status(404).json({ error: "Document not found" });
-
   const pageId = typeof req.body?.pageId === "string" ? req.body.pageId : null;
   if (!pageId) return res.status(400).json({ error: "pageId required" });
-  if (!doc.pages.some((p) => p.id === pageId)) return res.status(400).json({ error: "Page not found in document" });
 
-  const current = new Set(doc.sharedPageIds ?? []);
-  // Toggle: if already shared remove it, otherwise add it
-  if (current.has(pageId)) {
-    current.delete(pageId);
-  } else {
-    current.add(pageId);
+  // Verify the page belongs to this user's document
+  const page = await prisma.page.findFirst({
+    where: { id: pageId, documentId: id, document: { ownerId: user.id } },
+    select: { id: true, isShared: true },
+  });
+  if (!page) return res.status(404).json({ error: "Page not found" });
+
+  // Toggle Page.isShared
+  const updated = await prisma.page.update({
+    where: { id: pageId },
+    data: { isShared: !page.isShared },
+    select: { id: true, isShared: true },
+  });
+
+  // Keep legacy Document.sharedPageIds in sync for rollback safety
+  const doc = await getDocumentDb(id, user.id);
+  if (doc) {
+    const currentSet = new Set(doc.sharedPageIds ?? []);
+    updated.isShared ? currentSet.add(pageId) : currentSet.delete(pageId);
+    const sharedPageIds = [...currentSet];
+    await upsertDocumentDb({ ...doc, sharedPageIds, isPublic: sharedPageIds.length > 0 }, user.id);
   }
 
-  const sharedPageIds = [...current];
-  const isPublic = sharedPageIds.length > 0;
+  // Return all shared page ids for this document
+  const sharedPages = await prisma.page.findMany({
+    where: { documentId: id, isShared: true },
+    select: { id: true },
+  });
 
-  const updated = await upsertDocumentDb({ ...doc, isPublic, sharedPageIds }, user.id);
   return res.status(200).json({
-    isPublic: updated.isPublic ?? false,
-    sharedPageIds: updated.sharedPageIds ?? [],
+    isPublic: sharedPages.length > 0,
+    sharedPageIds: sharedPages.map((p) => p.id),
   });
 }

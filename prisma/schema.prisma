@@ -54,17 +54,20 @@ model Document {
 }
 
 model Page {
-    id         String   @id
+    id         String    @id
     documentId String
     title      String
     content    String
     position   Int
+    isShared   Boolean   @default(false)
     createdAt  DateTime
     updatedAt  DateTime
-    document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+    document   Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+    comments   Comment[]
 
     @@index([documentId])
     @@index([documentId, position])
+    @@index([documentId, isShared])
 }
 
 model SharedPage {
@@ -81,14 +84,17 @@ model SharedPage {
 model Comment {
     id         String   @id
     documentId String
+    pageId     String?
     userId     String
     content    String
     author     String
     createdAt  DateTime
-    document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-    user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    document   Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+    page       Page?     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+    user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([documentId])
+    @@index([pageId])
     @@index([userId])
 }
 

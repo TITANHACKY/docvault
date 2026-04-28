@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { getPublicDocumentDb } from "@/lib/server/document-store";
-import type { StoredPage } from "@/lib/documents-types";
+import { prisma } from "@/lib/server/prisma";
 
 function extractMentionedPageIds(content: string): Set<string> {
   const ids = new Set<string>();
@@ -19,32 +18,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const id = typeof req.query.id === "string" ? req.query.id : null;
   if (!id) return res.status(400).json({ error: "Invalid document id" });
 
-  const doc = await getPublicDocumentDb(id);
-  if (!doc || !doc.sharedPageIds?.length) return res.status(404).json({ error: "Not found" });
+  // Fetch the document with all pages
+  const doc = await prisma.document.findFirst({
+    where: { id, isPublic: true },
+    select: {
+      id: true,
+      activePageId: true,
+      docPages: {
+        select: { id: true, title: true, content: true, position: true, isShared: true },
+        orderBy: { position: "asc" },
+      },
+    },
+  });
 
-  const sharedSet = new Set(doc.sharedPageIds);
+  if (!doc) return res.status(404).json({ error: "Not found" });
 
-  // Collect all shared pages, plus any pages they mention that are also in the doc
-  const allowedIds = new Set(sharedSet);
-  for (const page of doc.pages) {
-    if (!sharedSet.has(page.id)) continue;
+  const sharedPages = doc.docPages.filter((p) => p.isShared);
+  if (sharedPages.length === 0) return res.status(404).json({ error: "Not found" });
+
+  // Collect allowed page ids: shared pages + pages mentioned in their content
+  const allowedIds = new Set(sharedPages.map((p) => p.id));
+  for (const page of sharedPages) {
     for (const mentionedId of extractMentionedPageIds(page.content)) {
-      if (doc.pages.some((p) => p.id === mentionedId)) allowedIds.add(mentionedId);
+      if (doc.docPages.some((p) => p.id === mentionedId)) allowedIds.add(mentionedId);
     }
   }
 
-  // Preserve original page order
-  const pages: StoredPage[] = doc.pages.filter((p) => allowedIds.has(p.id));
-  if (!pages.length) return res.status(404).json({ error: "Not found" });
-
-  // Default to first shared page
-  const activePageId = sharedSet.has(doc.activePageId)
+  const pages = doc.docPages.filter((p) => allowedIds.has(p.id));
+  const activePageId = allowedIds.has(doc.activePageId)
     ? doc.activePageId
-    : doc.sharedPageIds[0];
+    : sharedPages[0].id;
 
   return res.status(200).json({
     id: doc.id,
-    sharedPageIds: doc.sharedPageIds,
+    sharedPageIds: sharedPages.map((p) => p.id),
     pages,
     activePageId,
   });

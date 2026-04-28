@@ -24,7 +24,7 @@ function assembleDocument(
     sharedPageIds: string[];
     createdAt: Date;
     updatedAt: Date;
-    docPages?: Array<{ id: string; title: string; content: string; position: number; createdAt: Date; updatedAt: Date }>;
+    docPages?: Array<{ id: string; title: string; content: string; position: number; isShared: boolean; createdAt: Date; updatedAt: Date }>;
     sharedPages?: Array<{ pageId: string }>;
   }
 ): StoredDocument {
@@ -37,6 +37,7 @@ function assembleDocument(
         id: p.id,
         title: p.title,
         content: p.content,
+        isShared: p.isShared,
         createdAt: toTimestamp(p.createdAt),
         updatedAt: toTimestamp(p.updatedAt),
       }));
@@ -44,9 +45,10 @@ function assembleDocument(
     pages = parseLegacyPages(doc.pages);
   }
 
-  // Prefer new SharedPage table; fall back to legacy sharedPageIds array
-  const sharedPageIds =
-    doc.sharedPages && doc.sharedPages.length > 0
+  // Prefer Page.isShared flags; fall back to SharedPage table; fall back to legacy sharedPageIds array
+  const sharedPageIds = pages.some((p) => p.isShared !== undefined)
+    ? pages.filter((p) => p.isShared).map((p) => p.id)
+    : doc.sharedPages && doc.sharedPages.length > 0
       ? doc.sharedPages.map((s) => s.pageId)
       : (doc.sharedPageIds ?? []);
 
@@ -77,7 +79,7 @@ function parseLegacyPages(input: unknown): StoredPage[] {
 }
 
 const docPageInclude = {
-  docPages: { select: { id: true, title: true, content: true, position: true, createdAt: true, updatedAt: true } },
+  docPages: { select: { id: true, title: true, content: true, position: true, isShared: true, createdAt: true, updatedAt: true } },
   sharedPages: { select: { pageId: true } },
 } as const;
 
@@ -94,12 +96,13 @@ export async function getPublicDocumentPrisma(id: string): Promise<StoredDocumen
 }
 
 function toStoredComment(record: {
-  id: string; documentId: string; userId: string;
-  content: string; author: string; createdAt: Date;
+  id: string; documentId: string; pageId?: string | null;
+  userId: string; content: string; author: string; createdAt: Date;
 }): StoredComment {
   return {
     id: record.id,
     documentId: record.documentId,
+    pageId: record.pageId ?? undefined,
     userId: record.userId,
     content: record.content,
     author: record.author,
@@ -264,6 +267,7 @@ export async function listCommentsPrisma(documentId: string, userId: string): Pr
   const rows = await prisma.comment.findMany({
     where: { documentId, document: { ownerId: userId } },
     orderBy: { createdAt: "asc" },
+    select: { id: true, documentId: true, pageId: true, userId: true, content: true, author: true, createdAt: true },
   });
   return rows.map(toStoredComment);
 }
@@ -273,16 +277,19 @@ export async function addCommentPrisma(
   userId: string,
   content: string,
   author = "You",
+  pageId?: string,
 ): Promise<StoredComment> {
   const row = await prisma.comment.create({
     data: {
       id: randomUUID(),
       documentId,
+      pageId: pageId ?? null,
       userId,
       content: content.trim(),
       author,
       createdAt: new Date(),
     },
+    select: { id: true, documentId: true, pageId: true, userId: true, content: true, author: true, createdAt: true },
   });
   return toStoredComment(row);
 }
