@@ -18,9 +18,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const id = typeof req.query.id === "string" ? req.query.id : null;
   if (!id) return res.status(400).json({ error: "Invalid document id" });
 
-  // Fetch the document with all pages
   const doc = await prisma.document.findFirst({
-    where: { id, isPublic: true },
+    where: { id, docPages: { some: { isShared: true } } },
     select: {
       id: true,
       activePageId: true,
@@ -36,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const sharedPages = doc.docPages.filter((p) => p.isShared);
   if (sharedPages.length === 0) return res.status(404).json({ error: "Not found" });
 
-  // Collect allowed page ids: shared pages + pages mentioned in their content
+  // Collect allowed ids: shared pages + pages mentioned in their content
   const allowedIds = new Set(sharedPages.map((p) => p.id));
   for (const page of sharedPages) {
     for (const mentionedId of extractMentionedPageIds(page.content)) {
@@ -45,9 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const pages = doc.docPages.filter((p) => allowedIds.has(p.id));
-  const activePageId = allowedIds.has(doc.activePageId)
-    ? doc.activePageId
-    : sharedPages[0].id;
+  const activePageId = allowedIds.has(doc.activePageId) ? doc.activePageId : sharedPages[0].id;
 
   return res.status(200).json({
     id: doc.id,
