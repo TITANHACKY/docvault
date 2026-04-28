@@ -43,12 +43,39 @@ model Document {
     sharedPageIds String[]
     createdAt    DateTime
     updatedAt    DateTime
-    owner        User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    owner        User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
     comments     Comment[]
+    docPages     Page[]
+    sharedPages  SharedPage[]
 
     @@index([ownerId])
     @@index([updatedAt])
     @@index([isPublic])
+}
+
+model Page {
+    id         String   @id
+    documentId String
+    title      String
+    content    String
+    position   Int
+    createdAt  DateTime
+    updatedAt  DateTime
+    document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+    @@index([documentId])
+    @@index([documentId, position])
+}
+
+model SharedPage {
+    id         String   @id @default(cuid())
+    documentId String
+    pageId     String
+    createdAt  DateTime @default(now())
+    document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+    @@unique([documentId, pageId])
+    @@index([documentId])
 }
 
 model Comment {

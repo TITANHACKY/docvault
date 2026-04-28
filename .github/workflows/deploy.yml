@@ -26,5 +26,5 @@ jobs:
             # 3. Build and Start the Docker Compose stack in detached mode
             docker-compose up -d --build
             
-            # 4. Database Migration (optional but recommended)
-            docker-compose exec -T app npx prisma db push
+            # 4. Run pending migrations safely (never drops data, rolls back on failure)
+            docker-compose exec -T app npx prisma migrate deploy
